@@ -1,0 +1,21 @@
+name: PartSeg_measurement
+display_name: PartSeg measurement
+contributions:
+  commands: 
+    - id: PartSeg_measurement.make_qwidget
+      python_name: partseg_measurement._widget:ExampleQWidget
+      title: Make example QWidget
+    - id: PartSeg_measurement.make_magic_widget
+      python_name: partseg_measurement._widget:example_magic_widget
+      title: Make example magic widget
+    - id: PartSeg_measurement.make_func_widget
+      python_name: partseg_measurement._widget:example_function_widget
+      title: Make example function widget   
+  widgets:
+    - command: PartSeg_measurement.make_qwidget
+      display_name: Example QWidget
+    - command: PartSeg_measurement.make_magic_widget
+      display_name: Example Magic Widget
+    - command: PartSeg_measurement.make_func_widget
+      autogenerate: true
+      display_name: Example Function Widget 
