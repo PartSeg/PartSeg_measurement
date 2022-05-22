@@ -1,5 +1,6 @@
 import numpy as np
-from partseg_measurement import ExampleQWidget, example_magic_widget
+
+from PartSeg_measurement import ExampleQWidget, example_magic_widget
 
 
 # make_napari_viewer is a pytest fixture that returns a napari viewer object
@@ -18,6 +19,7 @@ def test_example_q_widget(make_napari_viewer, capsys):
     # read captured output and check that it's as we expected
     captured = capsys.readouterr()
     assert captured.out == "napari has 1 layers\n"
+
 
 def test_example_magic_widget(make_napari_viewer, capsys):
     viewer = make_napari_viewer()

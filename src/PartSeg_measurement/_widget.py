@@ -6,8 +6,13 @@ see: https://napari.org/plugins/guides.html?#widgets
 
 Replace code below according to your needs.
 """
+import typing
+
 from magicgui import magic_factory
 from qtpy.QtWidgets import QHBoxLayout, QPushButton, QWidget
+
+if typing.TYPE_CHECKING:
+    import napari  # noqa: F401
 
 
 class ExampleQWidget(QWidget):
