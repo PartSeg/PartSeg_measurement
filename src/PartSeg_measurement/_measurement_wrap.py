@@ -2,6 +2,7 @@ import functools
 import inspect
 import operator
 import typing
+import warnings
 from abc import ABC
 from copy import copy
 
@@ -42,6 +43,15 @@ class MeasurementWrapBase(ABC):
             self._name if self._power == 1 else f"{self._name}^{self._power}"
         )
 
+    def all_additional_parameters_set(self):
+        """
+        If all additional parameters are set.
+
+        Functions could have additional parameters, different from layers data
+
+        """
+        return False
+
     def __pow__(self, power, modulo=None):
         if modulo is not None:
             raise RuntimeError("Modulo not supported")
@@ -74,6 +84,25 @@ class MeasurementWrapBase(ABC):
         )
 
 
+class MeasurementCache:
+    def __init__(self):
+        self.cache = {}
+
+    def calculate(self, func: MeasurementWrapBase, **kwargs):
+        try:
+            if func not in self.cache:
+                self.cache[func] = {}
+            key = tuple(kwargs.items())
+            if key not in self.cache[func]:
+                self.cache[func][key] = func(**kwargs)
+            return self.cache[func][key]
+        except Exception as e:
+            warnings.warn(
+                f"Error then try to cache in measurement {func}: {e}"
+            )
+            return func(**kwargs)
+
+
 class MeasurementFunctionWrap(MeasurementWrapBase):
     def __init__(self, measurement_func, **kwargs):
         signature = inspect.signature(measurement_func)
@@ -81,6 +110,7 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
         super().__init__(**kwargs)
         self._measurement_func = measurement_func
         self._pass_args = pass_args
+        self.rename_args = {}
         functools.wraps(measurement_func)(self)
 
     @staticmethod
@@ -102,6 +132,14 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
         return tuple(signature.parameters.keys())
 
     def __call__(self, **kwargs):
+        try:
+            for from_, to in self.rename_args.items():
+                kwargs[to] = kwargs.pop(from_)
+        except KeyError:
+            raise RuntimeError(
+                "Not all parameters are set for measurement function"
+            )
+
         if self._pass_args:
             return (
                 self._measurement_func(
@@ -129,7 +167,10 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
             raise RuntimeError("operator could not handle all sources")
         super().__init__(**kwargs)
         self._operator = operator
-        self._sources = sources
+        self._sources = tuple(sources)
+
+    def __hash__(self):
+        return hash((self._operator, self._sources))
 
     def __call__(self, **kwargs):
         return (
