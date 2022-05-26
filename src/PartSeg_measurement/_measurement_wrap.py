@@ -1,4 +1,3 @@
-import functools
 import inspect
 import operator
 import typing
@@ -42,6 +41,14 @@ class MeasurementWrapBase(ABC):
         return (
             self._name if self._power == 1 else f"{self._name}^{self._power}"
         )
+
+    def as_dict(self):
+        return {
+            "name": self._name,
+            "power": self._power,
+            "long_description": self._long_description,
+            "units": self._units,
+        }
 
     def all_additional_parameters_set(self):
         """
@@ -103,15 +110,35 @@ class MeasurementCache:
             return func(**kwargs)
 
 
+@typing.final
 class MeasurementFunctionWrap(MeasurementWrapBase):
-    def __init__(self, measurement_func, **kwargs):
+    def __init__(self, measurement_func, rename_kwargs=None, **kwargs):
+        if isinstance(measurement_func, MeasurementFunctionWrap):
+            measurement_func = measurement_func._measurement_func
         signature = inspect.signature(measurement_func)
         pass_args = self._check_signature(signature)
         super().__init__(**kwargs)
         self._measurement_func = measurement_func
         self._pass_args = pass_args
-        self.rename_args = {}
-        functools.wraps(measurement_func)(self)
+        self._rename_kwargs = {} if rename_kwargs is None else rename_kwargs
+        # functools.wraps(measurement_func)(self)
+
+        annotations = copy(measurement_func.__annotations__)
+        parameters = dict(**signature.parameters)
+        for old_name, new_name in self._rename_kwargs.items():
+            annotations[new_name] = annotations.pop(old_name)
+            parameters[new_name] = parameters.pop(old_name).replace(
+                name=new_name
+            )
+        self.__annotations__ = annotations
+
+        self.__signature__ = inspect.Signature(
+            parameters=parameters.values(),
+            return_annotation=signature.return_annotation,
+        )
+        # self.__call__.__annotations__ = signature
+        self.__doc__ = measurement_func.__doc__
+        self.__name__ = measurement_func.__name__
 
     @staticmethod
     def _check_signature(signature: inspect.Signature):
@@ -131,10 +158,31 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
             return tuple()
         return tuple(signature.parameters.keys())
 
+    def __copy__(self):
+        return MeasurementFunctionWrap(
+            self._measurement_func,
+            name=self._name,
+            units=self._units,
+            power=self._power,
+        )
+
+    def as_dict(self):
+        res = super().as_dict()
+        res["measurement_func"] = self._measurement_func
+        res["rename_kwargs"] = self._rename_kwargs
+        return res
+
+    def rename_parameter(
+        self, old_name, new_name
+    ) -> "MeasurementFunctionWrap":
+        dkt = self.as_dict()
+        dkt["rename_kwargs"][old_name] = new_name
+        return self.__class__(**dkt)
+
     def __call__(self, **kwargs):
         try:
-            for from_, to in self.rename_args.items():
-                kwargs[to] = kwargs.pop(from_)
+            for from_, to in self._rename_kwargs.items():
+                kwargs[from_] = kwargs.pop(to)
         except KeyError:
             raise RuntimeError(
                 "Not all parameters are set for measurement function"

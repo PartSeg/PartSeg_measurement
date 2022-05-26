@@ -48,6 +48,24 @@ class TestMeasurementFunctionWrap:
         assert wrap(a=1, b=2, d=3) == 3
         assert not c_in
 
+    def test_rename_kwargs(self):
+        def func(a: int, b: float) -> float:
+            """Sample docstring"""
+            return a + b
+
+        wrap = MeasurementFunctionWrap(
+            measurement_func=func,
+            name=func,
+            units="m",
+            rename_kwargs={"a": "x"},
+        ).rename_parameter("b", "y")
+        assert wrap(x=1, y=2) == 3
+        sig = inspect.signature(wrap)
+        assert sig.parameters["x"].name == "x"
+        assert sig.parameters["x"].annotation == int
+        assert sig.parameters["y"].name == "y"
+        assert sig.parameters["y"].annotation == float
+
 
 class TestMeasurementCombinationWrap:
     def test_operations_on_wraps_div(self):
