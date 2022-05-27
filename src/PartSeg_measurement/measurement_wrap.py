@@ -149,18 +149,17 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
 
         annotations = copy(measurement_func.__annotations__)
         parameters = dict(**signature.parameters)
-        for old_name, new_name in self._rename_kwargs.items():
-            annotations[new_name] = annotations.pop(old_name)
-            parameters[new_name] = parameters.pop(old_name).replace(
+        for new_name, original_name in self._rename_kwargs.items():
+            annotations[new_name] = annotations.pop(original_name)
+            parameters[new_name] = parameters.pop(original_name).replace(
                 name=new_name
             )
         self.__annotations__ = annotations
 
         self.__signature__ = inspect.Signature(
-            list(parameters=parameters.values()),
+            parameters=list(parameters.values()),
             return_annotation=signature.return_annotation,
         )
-        # self.__call__.__annotations__ = signature
         self.__doc__ = measurement_func.__doc__
         self.__name__ = measurement_func.__name__
 
@@ -183,17 +182,12 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
         return tuple(signature.parameters.keys())
 
     def __copy__(self):
-        return MeasurementFunctionWrap(
-            self._measurement_func,
-            name=self._name,
-            units=self._units,
-            power=self._power,
-        )
+        return MeasurementFunctionWrap(**self.as_dict())
 
     def as_dict(self):
         res = super().as_dict()
         res["measurement_func"] = self._measurement_func
-        res["rename_kwargs"] = self._rename_kwargs
+        res["rename_kwargs"] = copy(self._rename_kwargs)
         return res
 
     def rename_parameter(
@@ -215,13 +209,18 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
             Copy of the measurement function with renamed parameter.
         """
         dkt = self.as_dict()
-        dkt["rename_kwargs"][current_name] = new_name
+        if current_name in dkt["rename_kwargs"]:
+            dkt["rename_kwargs"][new_name] = dkt["rename_kwargs"].pop(
+                current_name
+            )
+        else:
+            dkt["rename_kwargs"][new_name] = current_name
         return self.__class__(**dkt)
 
     def __call__(self, **kwargs):
         try:
-            for from_, to in self._rename_kwargs.items():
-                kwargs[from_] = kwargs.pop(to)
+            for current_name, original_name in self._rename_kwargs.items():
+                kwargs[original_name] = kwargs.pop(current_name)
         except KeyError:
             raise RuntimeError(
                 "Not all parameters are set for measurement function"

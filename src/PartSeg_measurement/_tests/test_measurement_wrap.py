@@ -57,7 +57,7 @@ class TestMeasurementFunctionWrap:
             measurement_func=func,
             name=func,
             units="m",
-            rename_kwargs={"a": "x"},
+            rename_kwargs={"x": "a"},
         ).rename_parameter("b", "y")
         assert wrap(x=1, y=2) == 3
         sig = inspect.signature(wrap)
@@ -65,6 +65,24 @@ class TestMeasurementFunctionWrap:
         assert sig.parameters["x"].annotation == int
         assert sig.parameters["y"].name == "y"
         assert sig.parameters["y"].annotation == float
+
+    def test_rename_kwargs2(self):
+        def func(a: int, b: float) -> float:
+            """Sample docstring"""
+            return a + b
+
+        wrap = MeasurementFunctionWrap(
+            measurement_func=func,
+            name=func,
+            units="m",
+            rename_kwargs={"x": "a"},
+        ).rename_parameter("x", "y")
+        assert wrap(y=1, b=2) == 3
+        sig = inspect.signature(wrap)
+        assert sig.parameters["y"].name == "y"
+        assert sig.parameters["y"].annotation == int
+        assert sig.parameters["b"].name == "b"
+        assert sig.parameters["b"].annotation == float
 
 
 class TestMeasurementCombinationWrap:
