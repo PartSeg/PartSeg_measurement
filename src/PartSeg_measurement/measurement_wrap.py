@@ -136,15 +136,22 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
     Wrapper for measurement functions.
     """
 
-    def __init__(self, measurement_func, rename_kwargs=None, **kwargs):
+    def __init__(
+        self,
+        measurement_func: typing.Callable,
+        rename_kwargs: typing.Optional[typing.Dict[str, str]] = None,
+        bind_args: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        **kwargs,
+    ):
         if isinstance(measurement_func, MeasurementFunctionWrap):
             measurement_func = measurement_func._measurement_func
         signature = inspect.signature(measurement_func)
         pass_args = self._check_signature(signature)
         super().__init__(**kwargs)
-        self._measurement_func = measurement_func
+        self._measurement_func: typing.Callable = measurement_func
         self._pass_args = pass_args
         self._rename_kwargs = {} if rename_kwargs is None else rename_kwargs
+        self._bind_args = {} if bind_args is None else bind_args
         # functools.wraps(measurement_func)(self)
 
         annotations = copy(measurement_func.__annotations__)
@@ -188,6 +195,7 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
         res = super().as_dict()
         res["measurement_func"] = self._measurement_func
         res["rename_kwargs"] = copy(self._rename_kwargs)
+        res["bind_args"] = copy(self._bind_args)
         return res
 
     def rename_parameter(
@@ -217,6 +225,14 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
             dkt["rename_kwargs"][new_name] = current_name
         return self.__class__(**dkt)
 
+    def bind(self, **kwargs) -> "MeasurementFunctionWrap":
+        dkt = self.as_dict()
+        for name, value in kwargs.items():
+            if name in dkt["rename_kwargs"]:
+                name = dkt["rename_kwargs"][name]
+            dkt["bind_args"][name] = value
+        return self.__class__(**dkt)
+
     def __call__(self, **kwargs):
         try:
             for current_name, original_name in self._rename_kwargs.items():
@@ -225,6 +241,8 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
             raise RuntimeError(
                 "Not all parameters are set for measurement function"
             )
+        for name, value in self._bind_args.items():
+            kwargs[name] = value
 
         if self._pass_args:
             return (
