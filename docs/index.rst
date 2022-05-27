@@ -13,6 +13,8 @@ Welcome to PartSeg measurement's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   measurement_wrap
+
 
 
 Indices and tables

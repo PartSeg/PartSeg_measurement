@@ -9,7 +9,7 @@ from sympy import Symbol, symbols
 
 
 class UnitsException(Exception):
-    pass
+    """Raised where units do not match"""
 
 
 class MeasurementWrapBase(ABC):
@@ -92,17 +92,37 @@ class MeasurementWrapBase(ABC):
 
 
 class MeasurementCache:
+    """
+    Cache for measurement functions.
+    For speedup of repeated calls.
+    """
+
     def __init__(self):
-        self.cache = {}
+        self._cache = {}
 
     def calculate(self, func: MeasurementWrapBase, **kwargs):
+        """
+        Try to get result from cache. If not found, calculate and store result.
+
+        Parameters
+        ----------
+        func: MeasurementWrapBase
+            Measurement function to be called.
+        kwargs: dict
+            Additional parameters for the measurement function.
+
+        Returns
+        -------
+        result: Any
+            Result of the measurement function.
+        """
         try:
-            if func not in self.cache:
-                self.cache[func] = {}
+            if func not in self._cache:
+                self._cache[func] = {}
             key = tuple(kwargs.items())
-            if key not in self.cache[func]:
-                self.cache[func][key] = func(**kwargs)
-            return self.cache[func][key]
+            if key not in self._cache[func]:
+                self._cache[func][key] = func(**kwargs)
+            return self._cache[func][key]
         except Exception as e:
             warnings.warn(
                 f"Error then try to cache in measurement {func}: {e}"
@@ -112,6 +132,10 @@ class MeasurementCache:
 
 @typing.final
 class MeasurementFunctionWrap(MeasurementWrapBase):
+    """
+    Wrapper for measurement functions.
+    """
+
     def __init__(self, measurement_func, rename_kwargs=None, **kwargs):
         if isinstance(measurement_func, MeasurementFunctionWrap):
             measurement_func = measurement_func._measurement_func
@@ -133,7 +157,7 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
         self.__annotations__ = annotations
 
         self.__signature__ = inspect.Signature(
-            parameters=parameters.values(),
+            list(parameters=parameters.values()),
             return_annotation=signature.return_annotation,
         )
         # self.__call__.__annotations__ = signature
@@ -173,10 +197,25 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
         return res
 
     def rename_parameter(
-        self, old_name, new_name
+        self, current_name, new_name
     ) -> "MeasurementFunctionWrap":
+        """
+        Return a copy of the measurement function with renamed parameter.
+
+        Parameters
+        ----------
+        current_name : str
+            Current parameter name.
+        new_name
+            New parameter name.
+
+        Returns
+        -------
+        func: MeasurementFunctionWrap
+            Copy of the measurement function with renamed parameter.
+        """
         dkt = self.as_dict()
-        dkt["rename_kwargs"][old_name] = new_name
+        dkt["rename_kwargs"][current_name] = new_name
         return self.__class__(**dkt)
 
     def __call__(self, **kwargs):
@@ -199,6 +238,10 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
 
 
 class MeasurementCombinationWrap(MeasurementWrapBase):
+    """
+    Represents combination of measurement functions.
+    """
+
     def __init__(self, operator, sources, **kwargs):
         signature = inspect.signature(operator)
         if not (
@@ -232,7 +275,32 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         )
 
 
-def measurement(units, name="", long_description="", power=1):
+def measurement(
+    units: typing.Union[str, Symbol],
+    name: str = "",
+    long_description: str = "",
+):
+    """
+    Decorator for measurement functions.
+
+    Parameters
+    ----------
+    units: str or sympy.Symbol
+    name: str, optional
+        Name for measurement function. If not calculated from
+        ``function.__name__`` by replace ``_`` with spaces and
+        capitalize firs letter.
+    long_description: str, optional
+        Long description for measurement function. Could be used for render in
+        user interface.
+
+    Returns
+    -------
+    func: typing.Callable[[typing.Callable], MeasurementWrapBase]
+        decorated function
+
+    """
+
     def _func(func):
         nonlocal name
         if name == "":
@@ -242,7 +310,7 @@ def measurement(units, name="", long_description="", power=1):
             name=name,
             units=units,
             long_description=long_description,
-            power=power,
+            power=1,
         )
 
     return _func

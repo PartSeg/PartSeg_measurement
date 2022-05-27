@@ -3,7 +3,7 @@ import inspect
 
 from sympy import symbols
 
-from PartSeg_measurement._measurement_wrap import (
+from PartSeg_measurement.measurement_wrap import (
     MeasurementCache,
     MeasurementFunctionWrap,
 )
