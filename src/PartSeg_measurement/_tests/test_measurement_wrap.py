@@ -95,6 +95,9 @@ class TestMeasurementFunctionWrap:
             name="func",
         ).bind(a=1)
         assert wrap(b=2) == 3
+        sig = inspect.signature(wrap)
+        assert "a" not in sig.parameters
+        assert "b" in sig.parameters
 
 
 class TestMeasurementCombinationWrap:

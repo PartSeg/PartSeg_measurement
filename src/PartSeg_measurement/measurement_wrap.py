@@ -156,6 +156,9 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
 
         annotations = copy(measurement_func.__annotations__)
         parameters = dict(**signature.parameters)
+        for name in self._bind_args:
+            del annotations[name]
+            del parameters[name]
         for new_name, original_name in self._rename_kwargs.items():
             annotations[new_name] = annotations.pop(original_name)
             parameters[new_name] = parameters.pop(original_name).replace(
