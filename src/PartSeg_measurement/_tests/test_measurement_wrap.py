@@ -1,7 +1,9 @@
 # pylint: disable=no-self-use
 import inspect
+import json
 
-from sympy import symbols
+import nme
+from sympy import Rational, symbols
 
 from PartSeg_measurement.measurement_wrap import (
     MeasurementCache,
@@ -99,6 +101,32 @@ class TestMeasurementFunctionWrap:
         assert "a" not in sig.parameters
         assert "b" in sig.parameters
 
+    def test_serialize(self, tmp_path, clean_register):
+        @nme.register_class
+        def func(a: int, b: float) -> float:
+            """Sample docstring"""
+            return a + b
+
+        wrap = (
+            MeasurementFunctionWrap(
+                measurement_func=func,
+                units="m",
+                name="func",
+            )
+            .bind(a=1)
+            .rename_parameter("b", "y")
+        )
+
+        with open(tmp_path / "test.json", "w") as f:
+            json.dump(wrap, f, cls=nme.NMEEncoder)
+
+        with open(tmp_path / "test.json") as f:
+            wrap2 = json.load(f, object_hook=nme.nme_object_hook)
+
+        assert wrap2.name == "func"
+        assert wrap2.units == symbols("m")
+        assert wrap2(y=2) == 3
+
 
 class TestMeasurementCombinationWrap:
     def test_operations_on_wraps_div(self):
@@ -134,6 +162,20 @@ class TestMeasurementCombinationWrap:
         mul = wrap1 * wrap2
         assert str(mul) == "func1 * func2"
         assert mul._units == symbols("m") ** 2
+
+    def test_power(self):
+        def func1(a: int, b: float) -> float:
+            return a + b
+
+        wrap = MeasurementFunctionWrap(
+            measurement_func=func1, name="func1", units="m"
+        )
+        pow1 = wrap**2.0
+        assert str(pow1) == "func1 ** 2.0"
+        assert pow1.units == symbols("m") ** Rational(2.0)
+        pow2 = pow1**3.0
+        assert pow2.units == symbols("m") ** Rational(6.0)
+        # FIXME assert str(pow2) == "func1 ** 6.0"
 
 
 class TestMeasurementCache:
