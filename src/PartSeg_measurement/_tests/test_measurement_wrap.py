@@ -394,6 +394,11 @@ class TestMeasurementCombinationWrap:
         assert "a parameter info" not in comb.__doc__
         assert "b : float" in comb.__doc__
         assert "b parameter" in comb.__doc__
+        comb2 = comb.bind(a=1)
+        assert "Func 1 docstring" in comb2.__doc__
+        assert "a : int" not in comb2.__doc__
+        comb3 = comb.rename_parameter("a", "y")
+        assert "y : int" in comb3.__doc__
 
 
 class TestMeasurementCache:

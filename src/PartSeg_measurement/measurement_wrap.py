@@ -125,6 +125,8 @@ class MeasurementWrapBase(ABC):
             "name": self._name,
             "long_description": self._long_description,
             "units": str(self._units) if serialize else self._units,
+            "rename_kwargs": copy(self._rename_kwargs),
+            "bind_args": copy(self._bind_args),
         }
 
     def all_additional_parameters_set(self):
@@ -332,8 +334,6 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
             if serialize
             else self._measurement_func
         )
-        res["rename_kwargs"] = copy(self._rename_kwargs)
-        res["bind_args"] = copy(self._bind_args)
         return res
 
     def __call__(self, **kwargs):
@@ -384,13 +384,14 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         raises = []
         descriptions = [self.name]
         for source in sources:
-            if not hasattr(source, "__doc__"):
+            if not (
+                isinstance(source, MeasurementWrapBase)
+                and hasattr(source, "__doc__")
+            ):
                 continue
             parsed = docstring_parser.parse(source.__doc__)
             raises.extend(parsed.raises)
-            descriptions.append(
-                f"{source.__name__}: {parsed.short_description}"
-            )
+            descriptions.append(f"{source.name}: {parsed.short_description}")
             if style is None:
                 style = parsed.style
             for param in parsed.params:
