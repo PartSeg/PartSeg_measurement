@@ -5,6 +5,7 @@ import warnings
 from abc import ABC
 from copy import copy
 
+import docstring_parser
 import nme
 from sympy import Rational, Symbol, parse_expr
 
@@ -292,8 +293,19 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
             parameters=list(parameters.values()),
             return_annotation=signature.return_annotation,
         )
-        self.__doc__ = measurement_func.__doc__
+        self.__doc__ = self._prepare_docs(measurement_func.__doc__)
         self.__name__ = measurement_func.__name__
+
+    def _prepare_docs(self, doc: typing.Optional[str]) -> str:
+        reverse_rename_kwargs = {y: x for x, y in self._rename_kwargs.items()}
+        parsed = docstring_parser.parse(doc)
+        for param in parsed.params:
+            if param.arg_name in reverse_rename_kwargs:
+                param.arg_name = reverse_rename_kwargs[param.arg_name]
+        for param in list(parsed.params):
+            if param.arg_name in self._bind_args:
+                parsed.meta.remove(param)
+        return docstring_parser.compose(parsed)
 
     @staticmethod
     def _check_signature(signature: inspect.Signature):

@@ -3,6 +3,7 @@ import inspect
 import json
 import operator
 
+import docstring_parser
 import nme
 import pytest
 from sympy import Rational, symbols
@@ -178,6 +179,53 @@ class TestMeasurementFunctionWrap:
                 units="m",
                 name="func",
             )
+
+    def test_prepare_doc_rename(self):
+        def func(a: int, b: float) -> float:
+            """
+            Sample docstring
+
+            Parameters
+            ----------
+            a : int
+                a
+            b : float
+                b
+            """
+            return a + b
+
+        wrap = MeasurementFunctionWrap(
+            measurement_func=func, name="func", units="m"
+        )
+        assert wrap.__doc__ == docstring_parser.compose(
+            docstring_parser.parse(func.__doc__)
+        )
+        wrap2 = wrap.rename_parameter("b", "y")
+        assert wrap2.__doc__ == docstring_parser.compose(
+            docstring_parser.parse(
+                func.__doc__.replace("b : float", "y : float")
+            )
+        )
+
+    def test_prepare_doc_bind(self):
+        def func(a: int, b: float) -> float:
+            """
+            Sample docstring
+
+            Parameters
+            ----------
+            a : int
+                a
+            b : float
+                b
+            """
+            return a + b
+
+        wrap = MeasurementFunctionWrap(
+            measurement_func=func, name="func", units="m"
+        ).bind(a=1)
+        assert len(docstring_parser.parse(wrap.__doc__).params) == 1
+        assert docstring_parser.parse(wrap.__doc__).params[0].arg_name == "b"
 
 
 class TestMeasurementCombinationWrap:
