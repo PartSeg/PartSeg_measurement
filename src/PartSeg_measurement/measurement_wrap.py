@@ -32,12 +32,10 @@ class MeasurementWrapBase(ABC):
         long_description: str = "",
         rename_kwargs: typing.Optional[typing.Dict[str, str]] = None,
         bind_args: typing.Optional[typing.Dict[str, typing.Any]] = None,
-        power=1,
     ):
         if isinstance(units, str):
             units = parse_expr(units)
         self._name = name
-        self._power = power
         self._long_description = long_description
         self._units = units
         self._rename_kwargs = {} if rename_kwargs is None else rename_kwargs
@@ -66,15 +64,38 @@ class MeasurementWrapBase(ABC):
             The prepared kwargs.
 
         """
-        try:
-            for current_name, original_name in self._rename_kwargs.items():
+        missed_kwargs = []
+        problematic_kwargs = {"kwargs"}
+
+        for current_name, original_name in self._rename_kwargs.items():
+            try:
                 kwargs[original_name] = kwargs.pop(current_name)
-        except KeyError:
-            raise RuntimeError(
-                "Not all parameters are set for measurement function"
-            )
+            except KeyError:
+                missed_kwargs.append(current_name)
+                problematic_kwargs.add(original_name)
+
         for name, value in self._bind_args.items():
             kwargs[name] = value
+
+        missed_kwargs.extend(
+            name
+            for name, value in inspect.signature(self).parameters.items()
+            if self._rename_kwargs.get(name, name) not in kwargs
+            and name not in problematic_kwargs
+            and value.kind != inspect.Parameter.VAR_KEYWORD
+        )
+
+        if len(missed_kwargs) == 1:
+            raise TypeError(
+                f"{self.name}() missing 1 required keyword-only argument:"
+                f" '{missed_kwargs[0]}'"
+            )
+        if missed_kwargs:
+            raise TypeError(
+                f"{self.name}() missing {len(missed_kwargs)} required "
+                f"keyword-only arguments: '{', '.join(missed_kwargs[:-1])}' "
+                f"and '{missed_kwargs[-1]}'"
+            )
         return kwargs
 
     def __call__(self, **kwargs):
@@ -84,9 +105,8 @@ class MeasurementWrapBase(ABC):
         return self.__class__(**self.as_dict(serialize=False))
 
     def __str__(self):
-        return (
-            self._name if self._power == 1 else f"{self._name}^{self._power}"
-        )
+        # FIXME add signature
+        return self.name
 
     def as_dict(self, serialize=True) -> typing.Dict[str, typing.Any]:
         """
@@ -102,7 +122,6 @@ class MeasurementWrapBase(ABC):
         """
         return {
             "name": self._name,
-            "power": self._power,
             "long_description": self._long_description,
             "units": str(self._units) if serialize else self._units,
         }
@@ -120,7 +139,7 @@ class MeasurementWrapBase(ABC):
         dkt = self.as_dict(serialize=False)
         for name, value in kwargs.items():
             if name in dkt["rename_kwargs"]:
-                name = dkt["rename_kwargs"][name]
+                name = dkt["rename_kwargs"].pop(name)
             dkt["bind_args"][name] = value
         return self.__class__(**dkt)
 
@@ -151,8 +170,6 @@ class MeasurementWrapBase(ABC):
         return self.__class__(**dkt)
 
     def __pow__(self, power, modulo=None):
-        if modulo is not None:
-            raise RuntimeError("Modulo not supported")
         res = copy(self)
         res._power = power
         return MeasurementCombinationWrap(
@@ -288,7 +305,7 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
             )
             for x in signature.parameters.values()
         ):
-            raise RuntimeError("Positional only parameters not supported")
+            raise TypeError("Positional only parameters not supported")
         if any(
             x.kind == inspect.Parameter.VAR_KEYWORD
             for x in signature.parameters.values()
@@ -311,13 +328,10 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
         kwargs = self.prepare_kwargs(**kwargs)
 
         if self._pass_args:
-            return (
-                self._measurement_func(
-                    **{name: kwargs[name] for name in self._pass_args}
-                )
-                ** self._power
+            return self._measurement_func(
+                **{name: kwargs[name] for name in self._pass_args}
             )
-        return self._measurement_func(**kwargs) ** self._power
+        return self._measurement_func(**kwargs)
 
 
 class MeasurementCombinationWrap(MeasurementWrapBase):
@@ -326,25 +340,20 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
     """
 
     def __init__(self, operator, sources, **kwargs):
-        signature = inspect.signature(operator)
-        if not (
-            len(
-                [
-                    v
-                    for v in signature.parameters.values()
-                    if v.default == inspect.Parameter.empty
-                ]
-            )
-            <= len(sources)
-            <= len(signature.parameters)
-        ):
+        if not self._check_operator(operator, sources):
             raise RuntimeError("operator could not handle all sources")
         super().__init__(**kwargs)
         self._operator = operator
         self._sources = tuple(sources)
 
+        self.__signature__ = self._calculate_signature(
+            self._operator, self._sources
+        )
+
+    @staticmethod
+    def _calculate_signature(operator, sources):
         sig_parameters = {}
-        for source in self._sources:
+        for source in sources:
             if not isinstance(source, MeasurementWrapBase):
                 continue
             sub_signature = inspect.signature(source)
@@ -359,8 +368,23 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
                         )
                     continue
                 sig_parameters[param.name] = param
-        self.__signature__ = inspect.Signature(
-            parameters=list(sig_parameters.values())
+        return inspect.Signature(parameters=list(sig_parameters.values()))
+
+    @staticmethod
+    def _check_operator(
+        operator: typing.Callable, sources: typing.Sequence
+    ) -> bool:
+        signature = inspect.signature(operator)
+        return (
+            len(
+                [
+                    v
+                    for v in signature.parameters.values()
+                    if v.default == inspect.Parameter.empty
+                ]
+            )
+            <= len(sources)
+            <= len(signature.parameters)
         )
 
     def as_dict(self, serialize=True) -> typing.Dict[str, typing.Any]:
@@ -379,14 +403,13 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
 
     def __call__(self, **kwargs):
         kwargs = self.prepare_kwargs(**kwargs)
-        return (
-            self._operator(
+        return self._operator(
+            *[
                 source(**kwargs)
                 if isinstance(source, MeasurementWrapBase)
                 else source
                 for source in self._sources
-            )
-            ** self._power
+            ]
         )
 
 
@@ -425,7 +448,6 @@ def measurement(
             name=name,
             units=units,
             long_description=long_description,
-            power=1,
         )
 
     return _func

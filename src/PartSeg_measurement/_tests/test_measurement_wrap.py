@@ -1,12 +1,15 @@
 # pylint: disable=no-self-use
 import inspect
 import json
+import operator
 
 import nme
+import pytest
 from sympy import Rational, symbols
 
 from PartSeg_measurement.measurement_wrap import (
     MeasurementCache,
+    MeasurementCombinationWrap,
     MeasurementFunctionWrap,
 )
 
@@ -105,6 +108,22 @@ class TestMeasurementFunctionWrap:
         assert "a" not in sig.parameters
         assert "b" in sig.parameters
 
+    def test_rename_bind(self):
+        def func(a: int, b: float) -> float:
+            """Sample docstring"""
+            return a + b
+
+        wrap = (
+            MeasurementFunctionWrap(
+                measurement_func=func,
+                units="m",
+                name="func",
+            )
+            .rename_parameter("a", "x")
+            .bind(x=1)
+        )
+        assert wrap(b=2) == 3
+
     def test_serialize(self, tmp_path, clean_register):
         @nme.register_class
         def func(a: int, b: float) -> float:
@@ -132,9 +151,37 @@ class TestMeasurementFunctionWrap:
         assert wrap2(y=2) == 3
         assert wrap2._measurement_func is func
 
+    def test_lack_of_kwarg(self):
+        def func(*, a: int, b: float) -> float:
+            """Sample docstring"""
+            return a + b
+
+        wrap = MeasurementFunctionWrap(
+            measurement_func=func,
+            units="m",
+            name="func",
+        )
+        with pytest.raises(TypeError):
+            wrap(a=1)
+
+        with pytest.raises(TypeError):
+            wrap.rename_parameter("b", "y")(a=1)
+
+    def test_positional_only_error(self):
+        def func(a: int, /, b: float) -> float:
+            """Sample docstring"""
+            return a + b
+
+        with pytest.raises(TypeError):
+            MeasurementFunctionWrap(
+                measurement_func=func,
+                units="m",
+                name="func",
+            )
+
 
 class TestMeasurementCombinationWrap:
-    def test_operations_on_wraps_div(self):
+    def test_div(self):
         def func1(a: int, b: float) -> float:
             return a + b
 
@@ -151,7 +198,19 @@ class TestMeasurementCombinationWrap:
         assert str(divided) == "func1 / func2"
         assert divided._units == 1
 
-    def test_operations_on_wraps_mul(self):
+    def test_div_2(self):
+        def func1(a: int, b: float) -> float:
+            return a + b
+
+        wrap = MeasurementFunctionWrap(
+            measurement_func=func1, name="func1", units="m"
+        )
+        wrap2 = wrap / 2
+        assert wrap2(a=2, b=4) == 3
+        assert str(wrap2) == "func1 / 2"
+        assert wrap2._units == symbols("m")
+
+    def test_mul(self):
         def func1(a: int, b: float) -> float:
             return a + b
 
@@ -167,6 +226,18 @@ class TestMeasurementCombinationWrap:
         mul = wrap1 * wrap2
         assert str(mul) == "func1 * func2"
         assert mul._units == symbols("m") ** 2
+
+    def test_mul_2(self):
+        def func1(a: int, b: float) -> float:
+            return a + b
+
+        wrap = MeasurementFunctionWrap(
+            measurement_func=func1, name="func1", units="m"
+        )
+        wrap2 = wrap * 2
+        assert wrap2(a=1, b=2) == 6
+        assert str(wrap2) == "func1 * 2"
+        assert wrap2.units == symbols("m")
 
     def test_power(self):
         def func1(a: int, b: float) -> float:
@@ -205,6 +276,36 @@ class TestMeasurementCombinationWrap:
         assert sig.parameters["b"].kind == inspect.Parameter.KEYWORD_ONLY
         assert sig.parameters["c"].annotation is float
         assert sig.parameters["c"].kind == inspect.Parameter.KEYWORD_ONLY
+
+    def test_to_low_num_sources(self):
+        def func1(a: int, b: float) -> float:
+            return a + b
+
+        wrap = MeasurementFunctionWrap(
+            measurement_func=func1, name="func1", units="m"
+        )
+        with pytest.raises(RuntimeError):
+            MeasurementCombinationWrap(
+                operator.mul, [wrap], units="m", name="test"
+            )
+
+    def test_annotation_collision(self):
+        def func1(a: int, b: float) -> float:
+            return a + b
+
+        def func2(a: int, b: int) -> float:
+            return a + b
+
+        wrap1 = MeasurementFunctionWrap(
+            measurement_func=func1, name="func1", units="m"
+        )
+        wrap2 = MeasurementFunctionWrap(
+            measurement_func=func2, name="func2", units="m"
+        )
+        with pytest.raises(
+            RuntimeError, match="Different annotations for parameter b"
+        ):
+            wrap1 * wrap2
 
 
 class TestMeasurementCache:
