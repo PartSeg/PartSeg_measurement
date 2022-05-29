@@ -213,15 +213,15 @@ class MeasurementCache:
     def __init__(self):
         self._cache = {}
 
-    def calculate(self, func: MeasurementWrapBase, **kwargs):
+    def calculate(self, func: typing.Callable, **kwargs):
         """
         Try to get result from cache. If not found, calculate and store result.
 
         Parameters
         ----------
-        func: MeasurementWrapBase
-            Measurement function to be called.
-        kwargs: dict
+        func: typing.Callable
+            Measurement function to be called. Need to be hashable
+        kwargs
             Additional parameters for the measurement function.
 
         Returns

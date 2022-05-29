@@ -326,3 +326,13 @@ class TestMeasurementCache:
         assert called == 2
         assert cache.calculate(_called, a=1, b=2) == 3
         assert called == 2
+
+    def test_cache_fail_hash(self):
+        def local_max(a):
+            return max(a)
+
+        cache = MeasurementCache()
+        assert cache.calculate(local_max, a=[1, 2, 3]) == 3
+        assert not cache._cache[local_max]
+        assert cache.calculate(local_max, a=(1, 2, 3)) == 3
+        assert cache._cache[local_max]
