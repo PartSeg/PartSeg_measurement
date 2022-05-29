@@ -126,6 +126,7 @@ class TestMeasurementFunctionWrap:
         assert wrap2.name == "func"
         assert wrap2.units == symbols("m")
         assert wrap2(y=2) == 3
+        assert wrap2._measurement_func is func
 
 
 class TestMeasurementCombinationWrap:

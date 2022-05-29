@@ -51,6 +51,32 @@ class MeasurementWrapBase(ABC):
     def units(self):
         return self._units
 
+    def prepare_kwargs(self, **kwargs) -> typing.Dict[str, typing.Any]:
+        """
+        Prepare the kwargs for the measurement function.
+
+        Parameters
+        ----------
+        kwargs: dict
+            The kwargs to prepare.
+
+        Returns
+        -------
+        dict
+            The prepared kwargs.
+
+        """
+        try:
+            for current_name, original_name in self._rename_kwargs.items():
+                kwargs[original_name] = kwargs.pop(current_name)
+        except KeyError:
+            raise RuntimeError(
+                "Not all parameters are set for measurement function"
+            )
+        for name, value in self._bind_args.items():
+            kwargs[name] = value
+        return kwargs
+
     def __call__(self, **kwargs):
         raise NotImplementedError
 
@@ -273,15 +299,7 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
         return res
 
     def __call__(self, **kwargs):
-        try:
-            for current_name, original_name in self._rename_kwargs.items():
-                kwargs[original_name] = kwargs.pop(current_name)
-        except KeyError:
-            raise RuntimeError(
-                "Not all parameters are set for measurement function"
-            )
-        for name, value in self._bind_args.items():
-            kwargs[name] = value
+        kwargs = self.prepare_kwargs(**kwargs)
 
         if self._pass_args:
             return (
@@ -331,6 +349,7 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         return hash((self._operator, self._sources))
 
     def __call__(self, **kwargs):
+        kwargs = self.prepare_kwargs(**kwargs)
         return (
             self._operator(
                 source(**kwargs)
