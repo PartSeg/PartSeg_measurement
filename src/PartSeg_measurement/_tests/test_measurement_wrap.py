@@ -21,7 +21,11 @@ class TestMeasurementFunctionWrap:
             measurement_func=func, name=func, units="m"
         )
         assert func.__doc__ == wrap.__doc__
-        assert inspect.signature(func) == inspect.signature(wrap)
+        sig = inspect.signature(wrap)
+        assert sig.parameters["a"].annotation is int
+        assert sig.parameters["a"].kind is inspect.Parameter.KEYWORD_ONLY
+        assert sig.parameters["b"].annotation is float
+        assert sig.parameters["b"].kind is inspect.Parameter.KEYWORD_ONLY
 
     def test_filtering_parameters(self):
         def func(a: int, b: float) -> float:
@@ -177,6 +181,30 @@ class TestMeasurementCombinationWrap:
         pow2 = pow1**3.0
         assert pow2.units == symbols("m") ** Rational(6.0)
         # FIXME assert str(pow2) == "func1 ** 6.0"
+
+    def test_proper_signature(self):
+        def func1(*, a: int, b: float) -> float:
+            return a + b
+
+        def func2(*, a: int, c: float) -> float:
+            return a + c
+
+        wrap1 = MeasurementFunctionWrap(
+            measurement_func=func1, name="func1", units="m"
+        )
+        wrap2 = MeasurementFunctionWrap(
+            measurement_func=func2, name="func2", units="m"
+        )
+        assert inspect.signature(wrap1) == inspect.signature(func1)
+        comb = wrap1 * wrap2
+        sig = inspect.signature(comb)
+        assert len(sig.parameters) == 3
+        assert sig.parameters["a"].annotation is int
+        assert sig.parameters["a"].kind == inspect.Parameter.KEYWORD_ONLY
+        assert sig.parameters["b"].annotation is float
+        assert sig.parameters["b"].kind == inspect.Parameter.KEYWORD_ONLY
+        assert sig.parameters["c"].annotation is float
+        assert sig.parameters["c"].kind == inspect.Parameter.KEYWORD_ONLY
 
 
 class TestMeasurementCache:

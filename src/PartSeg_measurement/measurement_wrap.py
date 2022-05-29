@@ -260,6 +260,15 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
             parameters[new_name] = parameters.pop(original_name).replace(
                 name=new_name
             )
+        for name in list(parameters):
+            if (
+                parameters[name].kind
+                == inspect.Parameter.POSITIONAL_OR_KEYWORD
+            ):
+                parameters[name] = parameters[name].replace(
+                    kind=inspect.Parameter.KEYWORD_ONLY
+                )
+
         self.__annotations__ = annotations
 
         self.__signature__ = inspect.Signature(
@@ -333,6 +342,26 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         super().__init__(**kwargs)
         self._operator = operator
         self._sources = tuple(sources)
+
+        sig_parameters = {}
+        for source in self._sources:
+            if not isinstance(source, MeasurementWrapBase):
+                continue
+            sub_signature = inspect.signature(source)
+            for param in sub_signature.parameters.values():
+                if param.name in sig_parameters:
+                    if (
+                        param.annotation
+                        != sig_parameters[param.name].annotation
+                    ):
+                        raise RuntimeError(
+                            f"Different annotations for parameter {param.name}"
+                        )
+                    continue
+                sig_parameters[param.name] = param
+        self.__signature__ = inspect.Signature(
+            parameters=list(sig_parameters.values())
+        )
 
     def as_dict(self, serialize=True) -> typing.Dict[str, typing.Any]:
         res = super().as_dict(serialize=serialize)
