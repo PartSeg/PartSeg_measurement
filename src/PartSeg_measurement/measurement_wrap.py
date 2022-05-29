@@ -361,6 +361,52 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         self.__signature__ = self._calculate_signature(
             self._operator, self._sources
         )
+        self.__doc__ = self._prepare_doc(self._sources)
+
+    def _prepare_doc(self, sources: typing.Sequence) -> str:
+        """
+        Prepare docstring base on docstring of sources.
+
+        Parameters
+        ----------
+        sources: typing.Sequence
+            Sequence of sources to prepare docstring for.
+
+        Returns
+        -------
+        str
+            Prepared docstring.
+        """
+        reverse_rename_kwargs = {y: x for x, y in self._rename_kwargs.items()}
+
+        args = {}
+        style = None
+        raises = []
+        descriptions = [self.name]
+        for source in sources:
+            if not hasattr(source, "__doc__"):
+                continue
+            parsed = docstring_parser.parse(source.__doc__)
+            raises.extend(parsed.raises)
+            descriptions.append(
+                f"{source.__name__}: {parsed.short_description}"
+            )
+            if style is None:
+                style = parsed.style
+            for param in parsed.params:
+                if param.arg_name in self._bind_args:
+                    continue
+                if param.arg_name in reverse_rename_kwargs:
+                    param.arg_name = reverse_rename_kwargs[param.arg_name]
+                if param.arg_name not in args:
+                    args[param.arg_name] = param
+
+        target_doc = docstring_parser.Docstring(style=style)
+        target_doc.meta.extend(args.values())
+        target_doc.meta.extend(raises)
+        target_doc.short_description = "\n\n".join(descriptions)
+
+        return docstring_parser.compose(target_doc)
 
     @staticmethod
     def _calculate_signature(operator, sources):

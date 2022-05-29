@@ -355,6 +355,46 @@ class TestMeasurementCombinationWrap:
         ):
             wrap1 * wrap2
 
+    def test_create_docstring_base(self):
+        def func1(a: int):
+            """
+            Func 1 docstring
+
+            Parameters
+            ----------
+            a : int
+                a parameter desc
+            """
+            return a
+
+        def func2(a: int, b: float):
+            """
+            Func 2 docstring
+
+            Parameters
+            ----------
+            a : int
+                a parameter info
+            b : float
+                b parameter
+            """
+            return a + b
+
+        wrap1 = MeasurementFunctionWrap(
+            measurement_func=func1, name="func1", units="m"
+        )
+        wrap2 = MeasurementFunctionWrap(
+            measurement_func=func2, name="func2", units="m"
+        )
+        comb = wrap1 * wrap2
+        assert "Func 1 docstring" in comb.__doc__
+        assert "Func 2 docstring" in comb.__doc__
+        assert "a : int" in comb.__doc__
+        assert "a parameter desc" in comb.__doc__
+        assert "a parameter info" not in comb.__doc__
+        assert "b : float" in comb.__doc__
+        assert "b parameter" in comb.__doc__
+
 
 class TestMeasurementCache:
     def test_cache_is_empty(self):
