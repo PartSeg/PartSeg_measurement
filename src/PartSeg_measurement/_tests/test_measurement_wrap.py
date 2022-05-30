@@ -260,6 +260,7 @@ class TestMeasurementCombinationWrap:
         assert str(pow1) == "func1 ** 2.0"
         pow2 = pow1**3.0
         assert str(pow2) == "func1 ** 2.0 ** 3.0"
+        assert pow2(a=1, b=2) == 3**6
         # FIXME assert str(pow2) == "func1 ** 6.0"
 
     def test_proper_signature(self):
@@ -273,6 +274,7 @@ class TestMeasurementCombinationWrap:
         wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         assert inspect.signature(wrap1) == inspect.signature(func1)
         comb = wrap1 * wrap2
+        assert comb(a=1, b=2, c=3) == 12
         sig = inspect.signature(comb)
         assert len(sig.parameters) == 3
         assert sig.parameters["a"].annotation is int
@@ -284,7 +286,7 @@ class TestMeasurementCombinationWrap:
 
     def test_to_low_num_sources(self):
         def func1(a: int, b: float) -> float:
-            return a + b
+            return a + b  # pragma: no cover
 
         wrap = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         with pytest.raises(RuntimeError):
@@ -292,10 +294,10 @@ class TestMeasurementCombinationWrap:
 
     def test_annotation_collision(self):
         def func1(a: int, b: float) -> float:
-            return a + b
+            return a + b  # pragma: no cover
 
         def func2(a: int, b: int) -> float:
-            return a + b
+            return a + b  # pragma: no cover
 
         wrap1 = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
@@ -332,6 +334,7 @@ class TestMeasurementCombinationWrap:
         wrap1 = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         comb = wrap1 * wrap2
+        assert comb(a=1, b=2) == 3
         assert "Func 1 docstring" in comb.__doc__
         assert "Func 2 docstring" in comb.__doc__
         assert "a : int" in comb.__doc__
@@ -413,6 +416,7 @@ class TestMeasurementDecorator:
             return a + b
 
         assert func.name == "test"
+        assert func(a=1, b=7) == 8
 
     def test_basic_serialization(self, clean_register, tmp_path):
         @measurement
@@ -511,19 +515,23 @@ class TestMeasurementCalculation:
 
         del meas[0]
         assert len(meas) == 1
+        assert meas(a=1, b=7, c=2) == [2]
         assert "b" not in inspect.signature(meas).parameters
         assert "c" in inspect.signature(meas).parameters
 
         meas[0] = func1
         assert len(meas) == 1
+        assert meas(a=1, b=7, c=2) == [8]
         assert "b" in inspect.signature(meas).parameters
         assert "c" not in inspect.signature(meas).parameters
 
         meas.insert(0, func2)
         assert len(meas) == 2
+        assert meas(a=1, b=7, c=2) == [2, 8]
         assert "b" in inspect.signature(meas).parameters
         assert "c" in inspect.signature(meas).parameters
 
         assert meas[0] is func2
         meas[:] = [func1, func2]
         assert meas[0] is func1
+        assert meas(a=1, b=7, c=2) == [8, 2]
