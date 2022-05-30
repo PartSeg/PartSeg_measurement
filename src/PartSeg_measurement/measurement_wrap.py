@@ -50,19 +50,21 @@ class MeasurementWrapBase(ABC):
     def units(self):
         return self._units
 
-    def prepare_kwargs(self, **kwargs) -> typing.Dict[str, typing.Any]:
+    def update_kwargs(self, **kwargs) -> typing.Dict[str, typing.Any]:
         """
-        Prepare the kwargs for the measurement function.
+        Update kwargs base on
+        :py:meth:`~MeasurementWrapBase.rename_parameter` and add
+        parameters from :py:meth:`~MeasurementWrapBase.bind` inputs.
 
         Parameters
         ----------
         kwargs: dict
-            The kwargs to prepare.
+            The kwargs to update.
 
         Returns
         -------
         dict
-            The prepared kwargs.
+            The updated kwargs.
 
         """
         missed_kwargs = []
@@ -337,7 +339,7 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
         return res
 
     def __call__(self, **kwargs):
-        kwargs = self.prepare_kwargs(**kwargs)
+        kwargs = self.update_kwargs(**kwargs)
 
         if self._pass_args:
             return self._measurement_func(
@@ -460,7 +462,7 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         return hash((self._operator, self._sources))
 
     def __call__(self, **kwargs):
-        kwargs = self.prepare_kwargs(**kwargs)
+        kwargs = self.update_kwargs(**kwargs)
         return self._operator(
             *[
                 source(**kwargs)
@@ -469,6 +471,12 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
                 for source in self._sources
             ]
         )
+
+
+class MeasurementResult:
+    def __init__(self, measurement: MeasurementWrapBase, value: typing.Any):
+        self._measurement = measurement
+        self._value = value
 
 
 class MeasurementCalculation(typing.MutableSequence[MeasurementWrapBase]):
