@@ -473,12 +473,6 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         )
 
 
-class MeasurementResult:
-    def __init__(self, measurement: MeasurementWrapBase, value: typing.Any):
-        self._measurement = measurement
-        self._value = value
-
-
 class MeasurementCalculation(typing.MutableSequence[MeasurementWrapBase]):
     """
     A class that represents a calculation of multiple measurements.
