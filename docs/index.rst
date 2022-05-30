@@ -16,14 +16,14 @@ Example of usage:
    import tifffile
    from PartSeg_measurement import measurement
 
-   @measurement
+   @measurement(units="nm**3")
    def volume(labels: Labels, voxel_size):
        """
        Calculate the volume of the object marked with positive pixels on labels array.
        """
        return np.count_nonzero(labels) * np.prod(voxel_size)
 
-   @measurement
+   @measurement(units="brightness")
    def sum_of_pixel_brightness(labels: Labels, image: np.ndarray) -> float:
        """
        Calculate the sum of the pixel brightness of the object marked with positive pixels on labels array.
