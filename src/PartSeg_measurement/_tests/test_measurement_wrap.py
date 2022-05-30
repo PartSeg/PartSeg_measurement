@@ -466,3 +466,34 @@ class TestMeasurementDecorator:
         assert isinstance(func, MeasurementFunctionWrap)
         assert func.units == symbols("m")
         assert func(a=1, b=7) == 8
+
+    def test_basic_serialization(self, clean_register, tmp_path):
+        @measurement(units="m")
+        def func(a: int, b: float) -> float:
+            return a + b
+
+        with open(tmp_path / "func.json", "w") as f_p:
+            json.dump(func, f_p, cls=nme.NMEEncoder)
+
+        with open(tmp_path / "func.json") as f_p:
+            func_1 = json.load(f_p, object_hook=nme.nme_object_hook)
+
+        assert func_1(a=1, b=7) == 8
+
+    def test_combination_serialization(self, clean_register, tmp_path):
+        @measurement(units="m")
+        def func1(a: int, b: float) -> float:
+            return a + b
+
+        @measurement(units="m")
+        def func2(a: int, b: float) -> float:
+            return a * b
+
+        comb = func1 * func2
+        with open(tmp_path / "comb.json", "w") as f_p:
+            json.dump(comb, f_p, cls=nme.NMEEncoder)
+
+        with open(tmp_path / "comb.json") as f_p:
+            comb_1 = json.load(f_p, object_hook=nme.nme_object_hook)
+
+        assert comb_1(a=1, b=7) == 56

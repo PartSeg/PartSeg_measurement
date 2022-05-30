@@ -221,7 +221,7 @@ class MeasurementCache:
         Try to get result from cache. If not found, calculate and store result.
 
         Parameters
-        ----------
+        ----------e
         func: typing.Callable
             Measurement function to be called. Need to be hashable
         kwargs
@@ -501,6 +501,7 @@ def measurement(
         nonlocal name
         if name == "":
             name = func.__name__.replace("_", " ").capitalize()
+        nme.register_class(func)
         return MeasurementFunctionWrap(
             func,
             name=name,
