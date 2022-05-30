@@ -13,8 +13,10 @@ Example of usage:
 
 .. code-block:: python
 
+   import numpy as np
    import tifffile
-   from PartSeg_measurement import measurement
+
+   from PartSeg_measurement import measurement, Image, Labels
 
    @measurement(units="nm**3")
    def volume(labels: Labels, voxel_size):

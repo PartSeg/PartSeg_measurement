@@ -36,6 +36,41 @@ To install latest development version :
     pip install git+https://github.com/czaki/PartSeg_measurement.git
 
 
+## Plugin Widget
+
+TODO
+
+## Library
+
+```python
+import numpy as np
+import tifffile
+
+from PartSeg_measurement import measurement, Image, Labels
+
+@measurement(units="nm**3")
+def volume(labels: Labels, voxel_size):
+   """
+   Calculate the volume of the object marked with positive pixels on labels array.
+   """
+   return np.count_nonzero(labels) * np.prod(voxel_size)
+
+@measurement(units="brightness")
+def sum_of_pixel_brightness(labels: Labels, image: Image) -> float:
+   """
+   Calculate the sum of the pixel brightness of the object marked with positive pixels on labels array.
+   """
+   return np.sum(image[labels > 0]) if np.any(labels) else 0
+
+density = sum_of_pixel_brightness / volume
+
+image = tifffile.imread('image.tif')
+labels = tifffile.imread('labels.tif')
+
+print(f"Density: {density(labels=labels, image=image, voxel_size=(210, 70, 70))}")
+
+```
+
 ## Contributing
 
 Contributions are very welcome. Tests can be run with [tox], please ensure
