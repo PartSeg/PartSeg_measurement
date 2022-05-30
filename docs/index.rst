@@ -18,14 +18,14 @@ Example of usage:
 
    from PartSeg_measurement import measurement, Image, Labels
 
-   @measurement(units="nm**3")
+   @measurement
    def volume(labels: Labels, voxel_size):
        """
        Calculate the volume of the object marked with positive pixels on labels array.
        """
        return np.count_nonzero(labels) * np.prod(voxel_size)
 
-   @measurement(units="brightness")
+   @measurement
    def sum_of_pixel_brightness(labels: Labels, image: np.ndarray) -> float:
        """
        Calculate the sum of the pixel brightness of the object marked with positive pixels on labels array.
