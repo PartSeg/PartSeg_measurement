@@ -7,7 +7,6 @@ from copy import copy
 
 import docstring_parser
 import nme
-from sympy import Rational, Symbol, parse_expr
 
 MeasurementWrapType = typing.TypeVar(
     "MeasurementWrapType", bound="MeasurementWrapBase"
@@ -29,26 +28,18 @@ class MeasurementWrapBase(ABC):
     def __init__(
         self,
         name: str,
-        units: typing.Union[str, Symbol],
         long_description: str = "",
         rename_kwargs: typing.Optional[typing.Dict[str, str]] = None,
         bind_args: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ):
-        if isinstance(units, str):
-            units = parse_expr(units)
         self._name = name
         self._long_description = long_description
-        self._units = units
         self._rename_kwargs = {} if rename_kwargs is None else rename_kwargs
         self._bind_args = {} if bind_args is None else bind_args
 
     @property
     def name(self):
         return self._name
-
-    @property
-    def units(self):
-        return self._units
 
     def update_kwargs(self, **kwargs) -> typing.Dict[str, typing.Any]:
         """
@@ -126,7 +117,6 @@ class MeasurementWrapBase(ABC):
         return {
             "name": self._name,
             "long_description": self._long_description,
-            "units": str(self._units) if serialize else self._units,
             "rename_kwargs": copy(self._rename_kwargs),
             "bind_args": copy(self._bind_args),
         }
@@ -181,31 +171,20 @@ class MeasurementWrapBase(ABC):
             operator=pow,
             sources=(copy(self), power, modulo),
             name=f"{self.name} ** {power}",
-            units=self._units ** Rational(power),
         )
 
     def __mul__(self, other):
-        if isinstance(other, MeasurementWrapBase):
-            units = self._units * other._units
-        else:
-            units = self._units
         return MeasurementCombinationWrap(
             operator=operator.mul,
             sources=(copy(self), copy(other)),
             name=f"{self} * {other}",
-            units=units,
         )
 
     def __truediv__(self, other):
-        if isinstance(other, MeasurementWrapBase):
-            units = self._units / other._units
-        else:
-            units = self._units
         return MeasurementCombinationWrap(
             operator=operator.truediv,
             sources=(copy(self), copy(other)),
             name=f"{self} / {other}",
-            units=units,
         )
 
 
@@ -265,6 +244,10 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
             measurement_func = measurement_func._measurement_func
         signature = inspect.signature(measurement_func)
         pass_args = self._check_signature(signature)
+        if "name" not in kwargs:
+            kwargs["name"] = measurement_func.__name__.replace(
+                "_", " "
+            ).capitalize()
         super().__init__(**kwargs)
         self._measurement_func: typing.Callable = measurement_func
         self._pass_args = pass_args
@@ -571,7 +554,7 @@ class MeasurementCalculation(typing.MutableSequence[MeasurementWrapBase]):
 
 
 def measurement(
-    units: typing.Union[str, Symbol],
+    fun: typing.Optional[typing.Callable] = None,
     name: str = "",
     long_description: str = "",
 ):
@@ -580,7 +563,8 @@ def measurement(
 
     Parameters
     ----------
-    units: str or sympy.Symbol
+    fun: typing.Callable, optional
+        The measurement function.
     name: str, optional
         Name for measurement function. If not calculated from
         ``function.__name__`` by replace ``_`` with spaces and
@@ -604,8 +588,10 @@ def measurement(
         return MeasurementFunctionWrap(
             func,
             name=name,
-            units=units,
             long_description=long_description,
         )
 
-    return _func
+    if fun is None:
+        return _func
+    else:
+        return _func(fun)

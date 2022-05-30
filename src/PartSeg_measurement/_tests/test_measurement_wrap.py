@@ -6,7 +6,6 @@ import operator
 import docstring_parser
 import nme
 import pytest
-from sympy import Rational, symbols
 
 from PartSeg_measurement.measurement_wrap import (
     MeasurementCache,
@@ -23,9 +22,7 @@ class TestMeasurementFunctionWrap:
             """Sample docstring"""
             return a + b
 
-        wrap = MeasurementFunctionWrap(
-            measurement_func=func, name=func, units="m"
-        )
+        wrap = MeasurementFunctionWrap(measurement_func=func)
         assert func.__doc__ == wrap.__doc__
         sig = inspect.signature(wrap)
         assert sig.parameters["a"].annotation is int
@@ -38,9 +35,7 @@ class TestMeasurementFunctionWrap:
             """Sample docstring"""
             return a + b
 
-        wrap = MeasurementFunctionWrap(
-            measurement_func=func, name=func, units="m"
-        )
+        wrap = MeasurementFunctionWrap(measurement_func=func)
         assert wrap(a=1, b=2, c=3) == 3
 
     def test_filtering_parameters_with_kwargs(self):
@@ -52,9 +47,7 @@ class TestMeasurementFunctionWrap:
             c_in = "c" in kwargs
             return a + b
 
-        wrap = MeasurementFunctionWrap(
-            measurement_func=func, name=func, units="m"
-        )
+        wrap = MeasurementFunctionWrap(measurement_func=func)
         assert wrap(a=1, b=2, c=3) == 3
         assert c_in
         assert wrap(a=1, b=2, d=3) == 3
@@ -67,8 +60,6 @@ class TestMeasurementFunctionWrap:
 
         wrap = MeasurementFunctionWrap(
             measurement_func=func,
-            name="func",
-            units="m",
             rename_kwargs={"x": "a"},
         ).rename_parameter("b", "y")
         assert wrap(x=1, y=2) == 3
@@ -85,8 +76,6 @@ class TestMeasurementFunctionWrap:
 
         wrap = MeasurementFunctionWrap(
             measurement_func=func,
-            name="func",
-            units="m",
             rename_kwargs={"x": "a"},
         ).rename_parameter("x", "y")
         assert wrap(y=1, b=2) == 3
@@ -103,8 +92,6 @@ class TestMeasurementFunctionWrap:
 
         wrap = MeasurementFunctionWrap(
             measurement_func=func,
-            units="m",
-            name="func",
         ).bind(a=1)
         assert wrap(b=2) == 3
         sig = inspect.signature(wrap)
@@ -119,8 +106,6 @@ class TestMeasurementFunctionWrap:
         wrap = (
             MeasurementFunctionWrap(
                 measurement_func=func,
-                units="m",
-                name="func",
             )
             .rename_parameter("a", "x")
             .bind(x=1)
@@ -136,8 +121,6 @@ class TestMeasurementFunctionWrap:
         wrap = (
             MeasurementFunctionWrap(
                 measurement_func=func,
-                units="m",
-                name="func",
             )
             .bind(a=1)
             .rename_parameter("b", "y")
@@ -149,8 +132,7 @@ class TestMeasurementFunctionWrap:
         with open(tmp_path / "test.json") as f:
             wrap2 = json.load(f, object_hook=nme.nme_object_hook)
 
-        assert wrap2.name == "func"
-        assert wrap2.units == symbols("m")
+        assert wrap2.name == "Func"
         assert wrap2(y=2) == 3
         assert wrap2._measurement_func is func
 
@@ -161,8 +143,6 @@ class TestMeasurementFunctionWrap:
 
         wrap = MeasurementFunctionWrap(
             measurement_func=func,
-            units="m",
-            name="func",
         )
         with pytest.raises(TypeError):
             wrap(a=1)
@@ -196,9 +176,7 @@ class TestMeasurementFunctionWrap:
             """
             return a + b
 
-        wrap = MeasurementFunctionWrap(
-            measurement_func=func, name="func", units="m"
-        )
+        wrap = MeasurementFunctionWrap(measurement_func=func, name="func")
         assert wrap.__doc__ == docstring_parser.compose(
             docstring_parser.parse(func.__doc__)
         )
@@ -224,7 +202,7 @@ class TestMeasurementFunctionWrap:
             return a + b
 
         wrap = MeasurementFunctionWrap(
-            measurement_func=func, name="func", units="m"
+            measurement_func=func, name="func"
         ).bind(a=1)
         assert len(docstring_parser.parse(wrap.__doc__).params) == 1
         assert docstring_parser.parse(wrap.__doc__).params[0].arg_name == "b"
@@ -238,27 +216,19 @@ class TestMeasurementCombinationWrap:
         def func2(a: int, b: float) -> float:
             return a - b
 
-        wrap1 = MeasurementFunctionWrap(
-            measurement_func=func1, name="func1", units="m"
-        )
-        wrap2 = MeasurementFunctionWrap(
-            measurement_func=func2, name="func2", units="m"
-        )
+        wrap1 = MeasurementFunctionWrap(measurement_func=func1, name="func1")
+        wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         divided = wrap1 / wrap2
         assert str(divided) == "func1 / func2"
-        assert divided._units == 1
 
     def test_div_2(self):
         def func1(a: int, b: float) -> float:
             return a + b
 
-        wrap = MeasurementFunctionWrap(
-            measurement_func=func1, name="func1", units="m"
-        )
+        wrap = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         wrap2 = wrap / 2
         assert wrap2(a=2, b=4) == 3
         assert str(wrap2) == "func1 / 2"
-        assert wrap2._units == symbols("m")
 
     def test_mul(self):
         def func1(a: int, b: float) -> float:
@@ -267,40 +237,29 @@ class TestMeasurementCombinationWrap:
         def func2(a: int, b: float) -> float:
             return a - b
 
-        wrap1 = MeasurementFunctionWrap(
-            measurement_func=func1, name="func1", units="m"
-        )
-        wrap2 = MeasurementFunctionWrap(
-            measurement_func=func2, name="func2", units="m"
-        )
+        wrap1 = MeasurementFunctionWrap(measurement_func=func1, name="func1")
+        wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         mul = wrap1 * wrap2
         assert str(mul) == "func1 * func2"
-        assert mul._units == symbols("m") ** 2
 
     def test_mul_2(self):
         def func1(a: int, b: float) -> float:
             return a + b
 
-        wrap = MeasurementFunctionWrap(
-            measurement_func=func1, name="func1", units="m"
-        )
+        wrap = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         wrap2 = wrap * 2
         assert wrap2(a=1, b=2) == 6
         assert str(wrap2) == "func1 * 2"
-        assert wrap2.units == symbols("m")
 
     def test_power(self):
         def func1(a: int, b: float) -> float:
             return a + b
 
-        wrap = MeasurementFunctionWrap(
-            measurement_func=func1, name="func1", units="m"
-        )
+        wrap = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         pow1 = wrap**2.0
         assert str(pow1) == "func1 ** 2.0"
-        assert pow1.units == symbols("m") ** Rational(2.0)
         pow2 = pow1**3.0
-        assert pow2.units == symbols("m") ** Rational(6.0)
+        assert str(pow2) == "func1 ** 2.0 ** 3.0"
         # FIXME assert str(pow2) == "func1 ** 6.0"
 
     def test_proper_signature(self):
@@ -310,12 +269,8 @@ class TestMeasurementCombinationWrap:
         def func2(*, a: int, c: float) -> float:
             return a + c
 
-        wrap1 = MeasurementFunctionWrap(
-            measurement_func=func1, name="func1", units="m"
-        )
-        wrap2 = MeasurementFunctionWrap(
-            measurement_func=func2, name="func2", units="m"
-        )
+        wrap1 = MeasurementFunctionWrap(measurement_func=func1, name="func1")
+        wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         assert inspect.signature(wrap1) == inspect.signature(func1)
         comb = wrap1 * wrap2
         sig = inspect.signature(comb)
@@ -331,13 +286,9 @@ class TestMeasurementCombinationWrap:
         def func1(a: int, b: float) -> float:
             return a + b
 
-        wrap = MeasurementFunctionWrap(
-            measurement_func=func1, name="func1", units="m"
-        )
+        wrap = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         with pytest.raises(RuntimeError):
-            MeasurementCombinationWrap(
-                operator.mul, [wrap], units="m", name="test"
-            )
+            MeasurementCombinationWrap(operator.mul, [wrap], name="test")
 
     def test_annotation_collision(self):
         def func1(a: int, b: float) -> float:
@@ -346,12 +297,8 @@ class TestMeasurementCombinationWrap:
         def func2(a: int, b: int) -> float:
             return a + b
 
-        wrap1 = MeasurementFunctionWrap(
-            measurement_func=func1, name="func1", units="m"
-        )
-        wrap2 = MeasurementFunctionWrap(
-            measurement_func=func2, name="func2", units="m"
-        )
+        wrap1 = MeasurementFunctionWrap(measurement_func=func1, name="func1")
+        wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         with pytest.raises(
             RuntimeError, match="Different annotations for parameter b"
         ):
@@ -382,12 +329,8 @@ class TestMeasurementCombinationWrap:
             """
             return a + b
 
-        wrap1 = MeasurementFunctionWrap(
-            measurement_func=func1, name="func1", units="m"
-        )
-        wrap2 = MeasurementFunctionWrap(
-            measurement_func=func2, name="func2", units="m"
-        )
+        wrap1 = MeasurementFunctionWrap(measurement_func=func1, name="func1")
+        wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         comb = wrap1 * wrap2
         assert "Func 1 docstring" in comb.__doc__
         assert "Func 2 docstring" in comb.__doc__
@@ -411,12 +354,8 @@ class TestMeasurementCombinationWrap:
         def func2(a: int, b: float):
             return a * b
 
-        wrap1 = MeasurementFunctionWrap(
-            measurement_func=func1, name="func", units="m"
-        )
-        wrap2 = MeasurementFunctionWrap(
-            measurement_func=func2, name="func4", units="m"
-        )
+        wrap1 = MeasurementFunctionWrap(measurement_func=func1, name="func")
+        wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func4")
         combine1 = wrap1 * wrap2
         with open(tmp_path / "combine1.json", "w") as f_p:
             json.dump(combine1, f_p, cls=nme.NMEEncoder)
@@ -460,16 +399,15 @@ class TestMeasurementCache:
 
 class TestMeasurementDecorator:
     def test_basic(self):
-        @measurement(units="m")
+        @measurement
         def func(a: int, b: float) -> float:
             return a + b
 
         assert isinstance(func, MeasurementFunctionWrap)
-        assert func.units == symbols("m")
         assert func(a=1, b=7) == 8
 
     def test_basic_serialization(self, clean_register, tmp_path):
-        @measurement(units="m")
+        @measurement
         def func(a: int, b: float) -> float:
             return a + b
 
@@ -482,11 +420,11 @@ class TestMeasurementDecorator:
         assert func_1(a=1, b=7) == 8
 
     def test_combination_serialization(self, clean_register, tmp_path):
-        @measurement(units="m")
+        @measurement
         def func1(a: int, b: float) -> float:
             return a + b
 
-        @measurement(units="m")
+        @measurement
         def func2(a: int, b: float) -> float:
             return a * b
 
@@ -502,11 +440,11 @@ class TestMeasurementDecorator:
 
 class TestMeasurementCalculation:
     def test_calculate_no_args(self, clean_register):
-        @measurement(units="m")
+        @measurement
         def func1(a: int, b: float):
             return a + b
 
-        @measurement(units="m")
+        @measurement
         def func2(a: int, b: float):
             return a * b
 
@@ -514,11 +452,11 @@ class TestMeasurementCalculation:
         assert meas(a=1, b=7) == [8, 7]
 
     def test_signature(self, clean_register):
-        @measurement(units="m")
+        @measurement
         def func1(a: int, b: float):
             return a + b
 
-        @measurement(units="m")
+        @measurement
         def func2(a: int, c: float):
             return a * c
 
@@ -531,11 +469,11 @@ class TestMeasurementCalculation:
         assert signature.parameters["c"].annotation is float
 
     def test_serialize(self, clean_register, tmp_path):
-        @measurement(units="m")
+        @measurement
         def func1(a: int, b: float):
             return a + b
 
-        @measurement(units="m")
+        @measurement
         def func2(a: int, c: float):
             return a * c
 
