@@ -501,7 +501,7 @@ class TestMeasurementDecorator:
 
 
 class TestMeasurementCalculation:
-    def test_calculate_no_args(self):
+    def test_calculate_no_args(self, clean_register):
         @measurement(units="m")
         def func1(a: int, b: float):
             return a + b
@@ -512,3 +512,38 @@ class TestMeasurementCalculation:
 
         meas = MeasurementCalculation([func1, func2])
         assert meas(a=1, b=7) == [8, 7]
+
+    def test_signature(self, clean_register):
+        @measurement(units="m")
+        def func1(a: int, b: float):
+            return a + b
+
+        @measurement(units="m")
+        def func2(a: int, c: float):
+            return a * c
+
+        meas = MeasurementCalculation([func1, func2])
+        assert meas(a=1, b=7, c=2) == [8, 2]
+        signature = inspect.signature(meas)
+        assert len(signature.parameters) == 3
+        assert signature.parameters["a"].annotation is int
+        assert signature.parameters["b"].annotation is float
+        assert signature.parameters["c"].annotation is float
+
+    def test_serialize(self, clean_register, tmp_path):
+        @measurement(units="m")
+        def func1(a: int, b: float):
+            return a + b
+
+        @measurement(units="m")
+        def func2(a: int, c: float):
+            return a * c
+
+        meas = MeasurementCalculation([func1, func2, func1 * func2])
+        with open(tmp_path / "meas.json", "w") as f_p:
+            json.dump(meas, f_p, cls=nme.NMEEncoder)
+
+        with open(tmp_path / "meas.json") as f_p:
+            meas_1 = json.load(f_p, object_hook=nme.nme_object_hook)
+
+        assert meas_1(a=1, b=7, c=2) == [8, 2, 16]

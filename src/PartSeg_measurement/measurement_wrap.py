@@ -483,6 +483,11 @@ class MeasurementCalculation(typing.MutableSequence[MeasurementWrapBase]):
         self.__signature__ = None
         self._update_signature()
 
+    def as_dict(self):
+        return {
+            "initial_measurements": self._list[:],
+        }
+
     def _verify_measurement(self, measurement: typing.Callable):
         if isinstance(measurement, MeasurementWrapBase):
             return measurement
