@@ -399,13 +399,20 @@ class TestMeasurementCache:
 
 
 class TestMeasurementDecorator:
-    def test_basic(self):
+    def test_basic(self, clean_register):
         @measurement
         def func(a: int, b: float) -> float:
             return a + b
 
         assert isinstance(func, MeasurementFunctionWrap)
         assert func(a=1, b=7) == 8
+
+    def test_name(self, clean_register):
+        @measurement(name="test")
+        def func(a: int, b: float) -> float:
+            return a + b
+
+        assert func.name == "test"
 
     def test_basic_serialization(self, clean_register, tmp_path):
         @measurement
@@ -462,6 +469,7 @@ class TestMeasurementCalculation:
             return a * c
 
         meas = MeasurementCalculation([func1, func2])
+        assert len(meas) == 2
         assert meas(a=1, b=7, c=2) == [8, 2]
         signature = inspect.signature(meas)
         assert len(signature.parameters) == 3
@@ -479,6 +487,7 @@ class TestMeasurementCalculation:
             return a * c
 
         meas = MeasurementCalculation([func1, func2, func1 * func2])
+        assert len(meas) == 3
         with open(tmp_path / "meas.json", "w") as f_p:
             json.dump(meas, f_p, cls=nme.NMEEncoder)
 
@@ -486,3 +495,35 @@ class TestMeasurementCalculation:
             meas_1 = json.load(f_p, object_hook=nme.nme_object_hook)
 
         assert meas_1(a=1, b=7, c=2) == [8, 2, 16]
+
+    def test_modification(self, clean_register):
+        @measurement
+        def func1(a: int, b: float):
+            return a + b
+
+        @measurement
+        def func2(a: int, c: float):
+            return a * c
+
+        meas = MeasurementCalculation([func1, func2])
+        assert len(meas) == 2
+        assert "b" in inspect.signature(meas).parameters
+
+        del meas[0]
+        assert len(meas) == 1
+        assert "b" not in inspect.signature(meas).parameters
+        assert "c" in inspect.signature(meas).parameters
+
+        meas[0] = func1
+        assert len(meas) == 1
+        assert "b" in inspect.signature(meas).parameters
+        assert "c" not in inspect.signature(meas).parameters
+
+        meas.insert(0, func2)
+        assert len(meas) == 2
+        assert "b" in inspect.signature(meas).parameters
+        assert "c" in inspect.signature(meas).parameters
+
+        assert meas[0] is func2
+        meas[:] = [func1, func2]
+        assert meas[0] is func1
