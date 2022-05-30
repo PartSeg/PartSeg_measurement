@@ -10,6 +10,7 @@ from sympy import Rational, symbols
 
 from PartSeg_measurement.measurement_wrap import (
     MeasurementCache,
+    MeasurementCalculation,
     MeasurementCombinationWrap,
     MeasurementFunctionWrap,
     measurement,
@@ -497,3 +498,17 @@ class TestMeasurementDecorator:
             comb_1 = json.load(f_p, object_hook=nme.nme_object_hook)
 
         assert comb_1(a=1, b=7) == 56
+
+
+class TestMeasurementCalculation:
+    def test_calculate_no_args(self):
+        @measurement(units="m")
+        def func1(a: int, b: float):
+            return a + b
+
+        @measurement(units="m")
+        def func2(a: int, b: float):
+            return a * b
+
+        meas = MeasurementCalculation([func1, func2])
+        assert meas(a=1, b=7) == [8, 7]

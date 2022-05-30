@@ -361,7 +361,7 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         self._sources = tuple(sources)
 
         self.__signature__ = self._calculate_signature(
-            self._operator, self._sources
+            self._sources, self._operator
         )
         self.__doc__ = self._prepare_doc(self._sources)
 
@@ -412,7 +412,7 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         return docstring_parser.compose(target_doc)
 
     @staticmethod
-    def _calculate_signature(operator, sources):
+    def _calculate_signature(sources, operator=None):
         sig_parameters = {}
         for source in sources:
             if not isinstance(source, MeasurementWrapBase):
@@ -469,6 +469,98 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
                 for source in self._sources
             ]
         )
+
+
+class MeasurementCalculation(typing.MutableSequence[MeasurementWrapBase]):
+    """
+    A class that represents a calculation of multiple measurements.
+    """
+
+    def __init__(self, initial_measurements: typing.Sequence[typing.Callable]):
+        self._list: typing.List[MeasurementWrapBase] = [
+            self._verify_measurement(m) for m in initial_measurements
+        ]
+        self.__signature__ = None
+        self._update_signature()
+
+    def _verify_measurement(self, measurement: typing.Callable):
+        if isinstance(measurement, MeasurementWrapBase):
+            return measurement
+        if not callable(measurement):
+            raise TypeError(f"{measurement} is not a callable")
+        return MeasurementFunctionWrap(measurement)
+
+    def _update_signature(self):
+        self.__signature__ = MeasurementCombinationWrap._calculate_signature(
+            self._list
+        )
+
+    def __call__(self, **kwargs):
+        return [source(**kwargs) for source in self]
+
+    def insert(self, index: int, value: typing.Callable) -> None:
+        self._list.insert(index, self._verify_measurement(value))
+
+    @typing.overload
+    def __getitem__(self, i: int) -> MeasurementWrapBase:
+        ...
+
+    @typing.overload
+    def __getitem__(self, s: slice) -> "MeasurementCalculation":
+        ...
+
+    def __getitem__(
+        self, i: typing.Union[int, slice]
+    ) -> typing.Union[MeasurementWrapBase, "MeasurementCalculation"]:
+        return (
+            self.__class__(self._list[i])
+            if isinstance(i, slice)
+            else self._list[i]
+        )
+
+    @typing.overload
+    def __setitem__(self, i: int, o: typing.Callable) -> None:
+        ...
+
+    @typing.overload
+    def __setitem__(
+        self, s: slice, o: typing.Iterable[typing.Callable]
+    ) -> None:
+        ...
+
+    def __setitem__(
+        self,
+        i: typing.Union[int, slice],
+        o: typing.Union[typing.Callable, typing.Iterable[typing.Callable]],
+    ) -> None:
+        if isinstance(i, slice):
+            if not isinstance(o, typing.Iterable):
+                raise TypeError(
+                    f"{o} is not iterable, but a slice was requested"
+                )
+            self._list[i] = [self._verify_measurement(m) for m in o]
+        elif isinstance(o, typing.Iterable):
+            raise TypeError(
+                f"{o} is iterable, but a single index was requested"
+            )
+        else:
+            self._list[i] = self._verify_measurement(o)
+        self._update_signature()
+
+    @typing.overload
+    def __delitem__(self, i: int) -> None:
+        ...
+
+    @typing.overload
+    def __delitem__(self, i: slice) -> None:
+        ...
+
+    def __delitem__(self, i: typing.Union[int, slice]) -> None:
+        self._list.__delitem__(i)
+        self._update_signature()
+
+    def __len__(self) -> int:
+        return len(self._list)
 
 
 def measurement(
