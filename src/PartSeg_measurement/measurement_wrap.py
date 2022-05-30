@@ -352,6 +352,8 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
     """
 
     def __init__(self, operator, sources, **kwargs):
+        if isinstance(operator, str):
+            operator = nme.REGISTER.get_class(operator)
         if not self._check_operator(operator, sources):
             raise RuntimeError("operator could not handle all sources")
         super().__init__(**kwargs)
@@ -451,10 +453,7 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         res["operator"] = (
             nme.class_to_str(self._operator) if serialize else self._operator
         )
-        res["sources"] = tuple(
-            nme.class_to_str(source) if serialize else source
-            for source in self._sources
-        )
+        res["sources"] = self._sources
         return res
 
     def __hash__(self):

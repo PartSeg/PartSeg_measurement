@@ -12,6 +12,7 @@ from PartSeg_measurement.measurement_wrap import (
     MeasurementCache,
     MeasurementCombinationWrap,
     MeasurementFunctionWrap,
+    measurement,
 )
 
 
@@ -400,6 +401,31 @@ class TestMeasurementCombinationWrap:
         comb3 = comb.rename_parameter("a", "y")
         assert "y : int" in comb3.__doc__
 
+    def test_serialize_bind_rename(self, tmp_path, clean_register):
+        @nme.register_class
+        def func1(a: int, b: float):
+            return a + b
+
+        @nme.register_class
+        def func2(a: int, b: float):
+            return a * b
+
+        wrap1 = MeasurementFunctionWrap(
+            measurement_func=func1, name="func", units="m"
+        )
+        wrap2 = MeasurementFunctionWrap(
+            measurement_func=func2, name="func4", units="m"
+        )
+        combine1 = wrap1 * wrap2
+        with open(tmp_path / "combine1.json", "w") as f_p:
+            json.dump(combine1, f_p, cls=nme.NMEEncoder)
+
+        with open(tmp_path / "combine1.json") as f_p:
+            combine1_1 = json.load(f_p, object_hook=nme.nme_object_hook)
+
+        assert isinstance(combine1_1, MeasurementCombinationWrap)
+        assert combine1_1(a=2, b=4) == 48
+
 
 class TestMeasurementCache:
     def test_cache_is_empty(self):
@@ -429,3 +455,14 @@ class TestMeasurementCache:
         assert not cache._cache[local_max]
         assert cache.calculate(local_max, a=(1, 2, 3)) == 3
         assert cache._cache[local_max]
+
+
+class TestMeasurementDecorator:
+    def test_basic(self):
+        @measurement(units="m")
+        def func(a: int, b: float) -> float:
+            return a + b
+
+        assert isinstance(func, MeasurementFunctionWrap)
+        assert func.units == symbols("m")
+        assert func(a=1, b=7) == 8
