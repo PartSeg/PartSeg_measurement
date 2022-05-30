@@ -391,7 +391,8 @@ class TestMeasurementCache:
             return max(a)
 
         cache = MeasurementCache()
-        assert cache.calculate(local_max, a=[1, 2, 3]) == 3
+        with pytest.warns(UserWarning, match="Error then try to"):
+            assert cache.calculate(local_max, a=[1, 2, 3]) == 3
         assert not cache._cache[local_max]
         assert cache.calculate(local_max, a=(1, 2, 3)) == 3
         assert cache._cache[local_max]
