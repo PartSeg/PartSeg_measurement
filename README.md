@@ -7,6 +7,7 @@
 [![codecov](https://codecov.io/gh/czaki/PartSeg_measurement/branch/main/graph/badge.svg)](https://codecov.io/gh/czaki/PartSeg_measurement)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/PartSeg_measurement)](https://napari-hub.org/plugins/PartSeg_measurement)
 [![Documentation Status](https://readthedocs.org/projects/partseg-measurement/badge/?version=latest)](https://partseg-measurement.readthedocs.io/en/latest/?badge=latest)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/Czaki/PartSeg_measurement/main.svg)](https://results.pre-commit.ci/latest/github/Czaki/PartSeg_measurement/main)
 
 Measurement engine for imaging data from PartSeg
 
