@@ -9,6 +9,34 @@ Welcome to PartSeg measurement's documentation!
 ``PartSeg_measurement`` is extraction and generalization of the
 :py:mod:`PartSeg` measurement engine for napari imaging data.
 
+Example of usage:
+
+.. code-block:: python
+   import tifffile
+   from PartSeg_measurement import measurement
+
+   @measurement
+   def volume(labels: Labels, voxel_size):
+    """
+    Calculate the volume of the object marked with positive pixels on labels array.
+    """
+    return np.count_nonzero(labels) * np.prod(voxel_size)
+
+    @measurement
+    def sum_of_pixel_brightness(labels: Labels, image: np.ndarray) -> float:
+    """
+    Calculate the sum of the pixel brightness of the object marked with positive pixels on labels array.
+    """
+    return np.sum(image[labels > 0]) if np.any(labels) else 0
+
+    density = sum_of_pixel_brightness / volume
+
+    image = tifffile.imread('image.tif')
+    labels = tifffile.imread('labels.tif')
+
+    print(f"Density: {density(labels=labels, image=image, voxel_size=(210, 70, 70))}")
+
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
