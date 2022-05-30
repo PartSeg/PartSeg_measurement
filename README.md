@@ -6,6 +6,8 @@
 [![tests](https://github.com/czaki/PartSeg_measurement/workflows/tests/badge.svg)](https://github.com/czaki/PartSeg_measurement/actions)
 [![codecov](https://codecov.io/gh/czaki/PartSeg_measurement/branch/main/graph/badge.svg)](https://codecov.io/gh/czaki/PartSeg_measurement)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/PartSeg_measurement)](https://napari-hub.org/plugins/PartSeg_measurement)
+[![Documentation Status](https://readthedocs.org/projects/partseg-measurement/badge/?version=latest)](https://partseg-measurement.readthedocs.io/en/latest/?badge=latest)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/Czaki/PartSeg_measurement/main.svg)](https://results.pre-commit.ci/latest/github/Czaki/PartSeg_measurement/main)
 
 Measurement engine for imaging data from PartSeg
 
@@ -33,6 +35,41 @@ To install latest development version :
 
     pip install git+https://github.com/czaki/PartSeg_measurement.git
 
+
+## Plugin Widget
+
+TODO
+
+## Library
+
+```python
+import numpy as np
+import tifffile
+
+from PartSeg_measurement import measurement, Image, Labels
+
+@measurement(units="nm**3")
+def volume(labels: Labels, voxel_size):
+   """
+   Calculate the volume of the object marked with positive pixels on labels array.
+   """
+   return np.count_nonzero(labels) * np.prod(voxel_size)
+
+@measurement(units="brightness")
+def sum_of_pixel_brightness(labels: Labels, image: Image) -> float:
+   """
+   Calculate the sum of the pixel brightness of the object marked with positive pixels on labels array.
+   """
+   return np.sum(image[labels > 0]) if np.any(labels) else 0
+
+density = sum_of_pixel_brightness / volume
+
+image = tifffile.imread('image.tif')
+labels = tifffile.imread('labels.tif')
+
+print(f"Density: {density(labels=labels, image=image, voxel_size=(210, 70, 70))}")
+
+```
 
 ## Contributing
 
