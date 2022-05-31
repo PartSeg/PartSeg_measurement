@@ -5,9 +5,11 @@ import operator
 
 import docstring_parser
 import nme
+import numpy as np
 import pytest
 
 from PartSeg_measurement.measurement_wrap import (
+    BoundInfo,
     MeasurementCache,
     MeasurementCalculation,
     MeasurementCombinationWrap,
@@ -15,6 +17,39 @@ from PartSeg_measurement.measurement_wrap import (
     measurement,
 )
 from PartSeg_measurement.types import Image, Labels
+
+
+class TestBoundInfo:
+    def test_base(self):
+        bound_info = BoundInfo(np.array([1, 10, 10]), np.array([20, 20, 20]))
+        assert np.all(bound_info.lower == np.array([1, 10, 10]))
+        assert np.all(bound_info.upper == np.array([20, 20, 20]))
+        assert np.all(bound_info.box_size() == np.array([20, 11, 11]))
+        assert "[1, 10, 10]" in str(bound_info)
+
+    def test_slice(self):
+        bound_info = BoundInfo(np.array([1, 10, 10]), np.array([20, 20, 20]))
+        assert bound_info.get_slices(0) == [
+            slice(1, 21),
+            slice(10, 21),
+            slice(10, 21),
+        ]
+        assert bound_info.get_slices(1) == [
+            slice(0, 22),
+            slice(9, 22),
+            slice(9, 22),
+        ]
+        assert bound_info.get_slices(2) == [
+            slice(0, 23),
+            slice(8, 23),
+            slice(8, 23),
+        ]
+
+    def test_del_dim(self):
+        bound_info = BoundInfo(np.array([1, 10, 10]), np.array([20, 20, 20]))
+        bound_info2 = bound_info.del_dim(1)
+        assert np.all(bound_info2.lower == np.array([1, 10]))
+        assert np.all(bound_info2.upper == np.array([20, 20]))
 
 
 class TestMeasurementFunctionWrap:

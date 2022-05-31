@@ -7,6 +7,7 @@ from copy import copy
 
 import docstring_parser
 import nme
+import numpy as np
 
 from .types import Labels
 
@@ -17,6 +18,70 @@ MeasurementWrapType = typing.TypeVar(
 
 class UnitsException(Exception):
     """Raised where units do not match"""
+
+
+class BoundInfo(typing.NamedTuple):
+    """
+    Information about bounding box
+
+    Attributes
+    ----------
+    lower : np.ndarray
+        Lower bound of a component
+    upper : np.ndarray
+        Upper bound of a component
+    """
+
+    lower: np.ndarray
+    upper: np.ndarray
+
+    def box_size(self) -> np.ndarray:
+        """Size of bounding box"""
+        return self.upper - self.lower + 1
+
+    def get_slices(self, margin=0) -> typing.List[slice]:
+        """
+        Get slices for each dimension
+
+        Parameters
+        ----------
+        margin : int
+            Margin to add to each bound
+
+        Returns
+        -------
+        slices : typing.List[slice]
+            List of slices for each dimension
+        """
+        return [
+            slice(max(x - margin, 0), y + 1 + margin)
+            for x, y in zip(self.lower, self.upper)
+        ]
+
+    def del_dim(self, axis: int) -> "BoundInfo":
+        """
+        Return copy of bound info without given axis
+
+        Parameters
+        ----------
+        axis : int
+            Axis to remove
+
+        Returns
+        -------
+        bound_info : BoundInfo
+            Copy of bound info without given axis
+        """
+
+        return BoundInfo(
+            np.delete(self.lower, axis), np.delete(self.upper, axis)
+        )
+
+    def __str__(self):
+        return (
+            f"{self.__class__.__name__}(lower={list(self.lower)},"
+            f" upper={list(self.upper)})"
+        )
 
 
 class MeasurementWrapBase(ABC):
