@@ -23,6 +23,7 @@ class TestMeasurementFunctionWrap:
             return a + b
 
         wrap = MeasurementFunctionWrap(measurement_func=func)
+        assert wrap(a=2, b=5) == 7
         assert func.__doc__ == wrap.__doc__
         sig = inspect.signature(wrap)
         assert sig.parameters["a"].annotation is int
@@ -139,7 +140,7 @@ class TestMeasurementFunctionWrap:
     def test_lack_of_kwarg(self):
         def func(*, a: int, b: float) -> float:
             """Sample docstring"""
-            return a + b
+            return a + b  # pragma: no cover
 
         wrap = MeasurementFunctionWrap(
             measurement_func=func,
@@ -153,12 +154,13 @@ class TestMeasurementFunctionWrap:
     def test_positional_only_error(self):
         def func(a: int, /, b: float) -> float:
             """Sample docstring"""
-            return a + b
+            return a + b  # pragma: no cover
 
-        with pytest.raises(TypeError):
+        with pytest.raises(
+            TypeError, match="Positional only parameters not supported"
+        ):
             MeasurementFunctionWrap(
                 measurement_func=func,
-                units="m",
                 name="func",
             )
 
@@ -186,6 +188,7 @@ class TestMeasurementFunctionWrap:
                 func.__doc__.replace("b : float", "y : float")
             )
         )
+        assert wrap2(a=3, y=6) == 9
 
     def test_prepare_doc_bind(self):
         def func(a: int, b: float) -> float:
@@ -206,6 +209,7 @@ class TestMeasurementFunctionWrap:
         ).bind(a=1)
         assert len(docstring_parser.parse(wrap.__doc__).params) == 1
         assert docstring_parser.parse(wrap.__doc__).params[0].arg_name == "b"
+        assert wrap(b=2) == 3
 
 
 class TestMeasurementCombinationWrap:
@@ -219,6 +223,7 @@ class TestMeasurementCombinationWrap:
         wrap1 = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         divided = wrap1 / wrap2
+        assert divided(a=3, b=1) == 2
         assert str(divided) == "func1 / func2"
 
     def test_div_2(self):
@@ -237,10 +242,11 @@ class TestMeasurementCombinationWrap:
         def func2(a: int, b: float) -> float:
             return a - b
 
-        wrap1 = MeasurementFunctionWrap(measurement_func=func1, name="func1")
+        wrap1 = MeasurementFunctionWrap(measurement_func=func1)
         wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         mul = wrap1 * wrap2
-        assert str(mul) == "func1 * func2"
+        assert mul(a=2, b=1) == 3
+        assert str(mul) == "Func1 * func2"
 
     def test_mul_2(self):
         def func1(a: int, b: float) -> float:
@@ -535,3 +541,51 @@ class TestMeasurementCalculation:
         meas[:] = [func1, func2]
         assert meas[0] is func1
         assert meas(a=1, b=7, c=2) == [8, 2]
+
+    def test_wrong_setitem(self, clean_register):
+        @measurement
+        def func1(a: int, b: float):
+            return a + b
+
+        meas = MeasurementCalculation([func1])
+        with pytest.raises(TypeError):
+            meas[0] = [func1, func1]
+
+        meas.append(func1)
+        with pytest.raises(TypeError):
+            meas[1:2] = func1
+
+    def test_non_callable(self):
+        with pytest.raises(TypeError):
+            MeasurementCalculation([1])
+
+    def test_not_wrapped_function(self, clean_register):
+        @measurement
+        def func1(a: int, b: float):
+            return a + b
+
+        def func2(a: int, c: float):
+            return a + c
+
+        meas = MeasurementCalculation([func1, func2])
+        assert len(meas) == 2
+        assert meas(a=1, b=7, c=2) == [8, 3]
+
+        assert "c" in inspect.signature(meas).parameters
+
+    def test_append_extend(self, clean_register):
+        @measurement
+        def func1(a: int, b: float):
+            return a + b
+
+        def func2(a: int, c: float):
+            return a + c
+
+        meas = MeasurementCalculation([])
+        meas.append(func1)
+        assert len(meas) == 1
+        assert "c" not in inspect.signature(meas).parameters
+        meas.extend([func2])
+        assert len(meas) == 2
+        assert "c" in inspect.signature(meas).parameters
+        assert meas(a=1, b=7, c=2) == [8, 3]

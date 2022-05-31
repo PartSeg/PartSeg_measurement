@@ -492,6 +492,14 @@ class MeasurementCalculation(typing.MutableSequence[MeasurementWrapBase]):
         self._list.insert(index, self._verify_measurement(value))
         self._update_signature()
 
+    def append(self, value: typing.Callable) -> None:
+        self._list.append(self._verify_measurement(value))
+        self._update_signature()
+
+    def extend(self, values: typing.Iterable[typing.Callable]) -> None:
+        self._list.extend(self._verify_measurement(value) for value in values)
+        self._update_signature()
+
     @typing.overload
     def __getitem__(self, i: int) -> MeasurementWrapBase:
         ...
