@@ -45,6 +45,7 @@ Example of usage:
    :caption: Contents:
 
    measurement_wrap
+   measurements
 
 
 

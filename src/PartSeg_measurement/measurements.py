@@ -36,9 +36,12 @@ def volume(labels: Labels, voxel_size, per_component: bool = False):
 
     Parameters
     ----------
-    labels : array with information of object voxels
-    voxel_size : tuple with voxel size in each dimension
-    per_component : If calculate the volume per component or global
+    labels : Labels
+        array with information of object voxels
+    voxel_size : (float, ...)
+        tuple with voxel size in each dimension
+    per_component : bool
+        If calculate the volume per component or global
     """
     if per_component:
         return np.bincount(labels.flat)[1:] * np.prod(voxel_size)
@@ -63,8 +66,10 @@ def voxels(labels: Labels, per_component: bool = False):
 
     Parameters
     ----------
-    labels : array with information of object voxels
-    per_component : If calculate the number of voxels per component or global
+    labels : Labels
+        array with information of object voxels
+    per_component :  bool
+        If calculate the number of voxels per component or global
     """
     reg = pint.get_application_registry()
     if per_component:
@@ -95,9 +100,12 @@ def pixel_brightness(
 
     Parameters
     ----------
-    labels : array with information of object voxels
-    image : array with pixel brightness
-    operation : operation to be applied to the pixel brightness
+    labels : Labels
+        array with information of object voxels
+    image : Image
+        array with pixel brightness
+    operation : PixelOpEnum
+        operation to be applied to the pixel brightness
     """
     return (
         operation.value(image[labels > 0]) if np.any(labels) else 0
