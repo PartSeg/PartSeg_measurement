@@ -92,6 +92,23 @@ class MeasurementWrapBase(ABC):
             )
         return kwargs
 
+    def __hash__(self):
+        return hash(
+            (
+                self.name,
+                tuple(self._bind_args.items()),
+                tuple(self._rename_kwargs.items()),
+            )
+        )
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, MeasurementWrapBase)
+            and self.name == other.name
+            and self._bind_args == other._bind_args
+            and self._rename_kwargs == other._rename_kwargs
+        )
+
     def __call__(self, **kwargs):
         raise NotImplementedError
 
@@ -330,6 +347,23 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
             )
         return self._measurement_func(**kwargs)
 
+    def __hash__(self):
+        return hash((self._measurement_func, super().__hash__()))
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, MeasurementFunctionWrap)
+            and self._measurement_func == other._measurement_func
+            and super().__eq__(other)
+        )
+
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__}({self._measurement_func}, "
+            f"rename_kwargs={repr(self._rename_kwargs)}, "
+            f"bind_args={repr(self._bind_args)})"
+        )
+
 
 class MeasurementCombinationWrap(MeasurementWrapBase):
     """
@@ -443,6 +477,14 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
 
     def __hash__(self):
         return hash((self._operator, self._sources))
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, MeasurementCombinationWrap)
+            and self._operator == other._operator
+            and self._sources == other._sources
+            and super().__eq__(other)
+        )
 
     def __call__(self, **kwargs):
         kwargs = self.update_kwargs(**kwargs)

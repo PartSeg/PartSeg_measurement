@@ -211,6 +211,43 @@ class TestMeasurementFunctionWrap:
         assert docstring_parser.parse(wrap.__doc__).params[0].arg_name == "b"
         assert wrap(b=2) == 3
 
+    def test_eq(self):
+        def func1(a: int, b: float) -> float:
+            return a + b
+
+        def func2(a: int, b: float) -> float:
+            return a + b  # pragma: no cover
+
+        wrap1 = MeasurementFunctionWrap(measurement_func=func1)
+        wrap1_1 = MeasurementFunctionWrap(measurement_func=func1)
+        assert wrap1 == wrap1_1
+        wrap2 = MeasurementFunctionWrap(measurement_func=func2)
+        assert wrap1 != wrap2
+        wrap3 = wrap1.bind(a=1).rename_parameter("b", "y")
+        assert wrap1 != wrap3
+        wrap4 = wrap1.rename_parameter("b", "y").bind(a=1)
+        assert wrap3 == wrap4
+        wrap5 = (
+            wrap1.rename_parameter("a", "c")
+            .bind(c=1)
+            .rename_parameter("b", "y")
+        )
+        assert wrap4 == wrap5
+        assert wrap1(a=1, b=2) == 3
+        assert wrap3(y=2) == 3
+
+    def test_repr(self):
+        def func(a: int, b: float) -> float:
+            return a + b  # pragma: no cover
+
+        wrap = MeasurementFunctionWrap(measurement_func=func)
+        assert wrap.__repr__().startswith(
+            "MeasurementFunctionWrap(<function TestMeasurementFunctionWrap."
+            "test_repr.<locals>.func at "
+        )
+        assert "{'y': 'b'}" in repr(wrap.rename_parameter("b", "y"))
+        assert "{'b': 1}" in repr(wrap.bind(b=1))
+
 
 class TestMeasurementCombinationWrap:
     def test_div(self):
@@ -375,6 +412,20 @@ class TestMeasurementCombinationWrap:
         assert isinstance(combine1_1, MeasurementCombinationWrap)
         assert combine1_1(a=2, b=4) == 48
 
+    def test_eq(self):
+        def func1(a: int, b: float):
+            return a + b  # pragma: no cover
+
+        def func2(a: int, b: float):
+            return a * b  # pragma: no cover
+
+        wrap1 = MeasurementFunctionWrap(measurement_func=func1)
+        wrap2 = MeasurementFunctionWrap(measurement_func=func2)
+        comb1 = wrap1 * wrap2
+        comb2 = wrap1 * wrap2
+        assert comb1 == comb2
+        assert comb1 is not comb2
+
 
 class TestMeasurementCache:
     def test_cache_is_empty(self):
@@ -405,6 +456,74 @@ class TestMeasurementCache:
         assert not cache._cache[local_max]
         assert cache.calculate(local_max, a=(1, 2, 3)) == 3
         assert cache._cache[local_max]
+
+    def test_cache_measurement_wrap(self):
+        called = 0
+
+        def _called(a: int, b: float) -> float:
+            nonlocal called
+            called += 1
+            return a + b
+
+        wrap = MeasurementFunctionWrap(_called, name="func")
+        cache = MeasurementCache()
+        assert cache.calculate(wrap, a=1, b=2) == 3
+        assert called == 1
+        assert cache.calculate(wrap, a=1, b=2) == 3
+        assert called == 1
+        assert cache.calculate(wrap, a=1, b=3) == 4
+        assert called == 2
+        assert cache.calculate(wrap, a=1, b=2) == 3
+        assert called == 2
+
+    def test_cache_measurement_wrap_with_kwargs(self):
+        called = 0
+
+        def _called(a: int, b: float) -> float:
+            nonlocal called
+            called += 1
+            return a + b
+
+        wrap = MeasurementFunctionWrap(_called, name="func")
+        wrap2 = wrap.bind(a=1)
+        wrap3 = wrap2.rename_parameter("b", "c")
+        wrap4 = wrap.rename_parameter("b", "c").bind(a=1)
+        cache = MeasurementCache()
+        assert cache.calculate(wrap, a=1, b=2) == 3
+        assert called == 1
+        assert cache.calculate(wrap2, b=2) == 3
+        assert called == 2
+        assert cache.calculate(wrap2, b=2) == 3
+        assert called == 2
+        assert cache.calculate(wrap3, c=2) == 3
+        assert called == 3
+        assert cache.calculate(wrap3, c=2) == 3
+        assert called == 3
+        assert cache.calculate(wrap4, c=2) == 3
+        assert called == 3
+
+    def test_cache_measurement_combine(self):
+        called = 0
+
+        def _called(a: int, b: float) -> float:
+            nonlocal called
+            called += 1
+            return a + b
+
+        wrap = MeasurementFunctionWrap(_called, name="func")
+        wrap2 = wrap * 2
+
+        cache = MeasurementCache()
+        assert cache.calculate(wrap, a=1, b=2) == 3
+        assert called == 1
+        assert cache.calculate(wrap2, a=1, b=2) == 6
+        assert called == 2
+        assert cache.calculate(wrap2, a=1, b=2) == 6
+        assert called == 2
+        assert cache.calculate(wrap2, a=1, b=4) == 10
+        assert called == 3
+        assert cache.calculate(wrap2, a=1, b=4) == 10
+        assert called == 3
 
 
 class TestMeasurementDecorator:
