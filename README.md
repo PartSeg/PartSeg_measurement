@@ -8,6 +8,8 @@
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/PartSeg_measurement)](https://napari-hub.org/plugins/PartSeg_measurement)
 [![Documentation Status](https://readthedocs.org/projects/partseg-measurement/badge/?version=latest)](https://partseg-measurement.readthedocs.io/en/latest/?badge=latest)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/Czaki/PartSeg_measurement/main.svg)](https://results.pre-commit.ci/latest/github/Czaki/PartSeg_measurement/main)
+[![Total alerts](https://img.shields.io/lgtm/alerts/g/Czaki/PartSeg_measurement.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Czaki/PartSeg_measurement/alerts/)
+[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/Czaki/PartSeg_measurement.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/Czaki/PartSeg_measurement/context:python)
 
 Measurement engine for imaging data from PartSeg
 
@@ -48,14 +50,14 @@ import tifffile
 
 from PartSeg_measurement import measurement, Image, Labels
 
-@measurement(units="nm**3")
+@measurement
 def volume(labels: Labels, voxel_size):
    """
    Calculate the volume of the object marked with positive pixels on labels array.
    """
    return np.count_nonzero(labels) * np.prod(voxel_size)
 
-@measurement(units="brightness")
+@measurement
 def sum_of_pixel_brightness(labels: Labels, image: Image) -> float:
    """
    Calculate the sum of the pixel brightness of the object marked with positive pixels on labels array.
