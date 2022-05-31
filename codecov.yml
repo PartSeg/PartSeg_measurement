@@ -7,11 +7,11 @@ coverage:
       library:
         target: auto
         paths: [ '!.*/_tests/.*' ]
-        threshold: 0.1%
+        threshold: 0.5%
       tests:
         target: auto
         paths: [ '.*/_tests/.*' ]
-        threshold: 0.1%
+        threshold: 0.5%
 comment:
   require_changes: true  # if true: only post the PR comment if coverage changes
 codecov:
