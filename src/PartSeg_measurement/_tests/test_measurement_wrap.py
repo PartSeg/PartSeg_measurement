@@ -555,6 +555,8 @@ class TestMeasurementCalculation:
         with pytest.raises(TypeError):
             meas[1:2] = func1
 
+        assert meas(a=1, b=7) == [8, 8]
+
     def test_non_callable(self):
         with pytest.raises(TypeError):
             MeasurementCalculation([1])
