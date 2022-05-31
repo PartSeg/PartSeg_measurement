@@ -8,6 +8,8 @@ from copy import copy
 import docstring_parser
 import nme
 
+from .types import Labels
+
 MeasurementWrapType = typing.TypeVar(
     "MeasurementWrapType", bound="MeasurementWrapBase"
 )
@@ -272,8 +274,29 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
 
         # functools.wraps(measurement_func)(self)
 
-        annotations = copy(measurement_func.__annotations__)
+        self.__signature__, self.__annotations__ = self._prepare_signature(
+            signature, measurement_func.__annotations__
+        )
+        self.__doc__ = self._prepare_docs(measurement_func.__doc__)
+        self.__name__ = measurement_func.__name__
+
+    def _prepare_signature(
+        self, signature: inspect.Signature, annotations: dict
+    ):
+        annotations = copy(annotations)
         parameters = dict(**signature.parameters)
+        if parameters and "per_component" not in parameters:
+            fist_arg = list(parameters.values())[0]
+            if fist_arg.annotation is Labels:
+                # FIXME add better recognition of labels
+                annotations["per_component"] = bool
+                parameters["per_component"] = inspect.Parameter(
+                    "per_component",
+                    inspect.Parameter.KEYWORD_ONLY,
+                    default=False,
+                    annotation=bool,
+                )
+
         for name in self._bind_args:
             del annotations[name]
             del parameters[name]
@@ -291,15 +314,13 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
                 parameters[name] = parameters[name].replace(
                     kind=inspect.Parameter.KEYWORD_ONLY
                 )
-
-        self.__annotations__ = annotations
-
-        self.__signature__ = inspect.Signature(
-            parameters=list(parameters.values()),
-            return_annotation=signature.return_annotation,
+        return (
+            inspect.Signature(
+                parameters=list(parameters.values()),
+                return_annotation=signature.return_annotation,
+            ),
+            annotations,
         )
-        self.__doc__ = self._prepare_docs(measurement_func.__doc__)
-        self.__name__ = measurement_func.__name__
 
     def _prepare_docs(self, doc: typing.Optional[str]) -> str:
         reverse_rename_kwargs = {y: x for x, y in self._rename_kwargs.items()}

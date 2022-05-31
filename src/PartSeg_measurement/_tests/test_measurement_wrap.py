@@ -14,6 +14,7 @@ from PartSeg_measurement.measurement_wrap import (
     MeasurementFunctionWrap,
     measurement,
 )
+from PartSeg_measurement.types import Image, Labels
 
 
 class TestMeasurementFunctionWrap:
@@ -247,6 +248,15 @@ class TestMeasurementFunctionWrap:
         )
         assert "{'y': 'b'}" in repr(wrap.rename_parameter("b", "y"))
         assert "{'b': 1}" in repr(wrap.bind(b=1))
+
+    def test_per_component_add(self):
+        def func(a: Labels, b: Image) -> float:
+            return b[a > 0].sum()
+
+        wrap = MeasurementFunctionWrap(measurement_func=func)
+        sig = inspect.signature(wrap)
+        assert sig.parameters["a"].annotation == Labels
+        assert sig.parameters["per_component"].annotation == bool
 
 
 class TestMeasurementCombinationWrap:
