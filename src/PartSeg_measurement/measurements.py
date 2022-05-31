@@ -1,7 +1,7 @@
 import math
 from enum import Enum
 from functools import partial
-from typing import Literal, Sequence, overload
+from typing import Literal, Sequence, Union, overload
 
 import numpy as np
 import pint
@@ -29,7 +29,9 @@ def volume(
 
 
 @measurement
-def volume(labels: Labels, voxel_size, per_component: bool = False):
+def volume(
+    labels: Labels, voxel_size, per_component: bool = False
+) -> Union[float, np.ndarray]:
     """
     Calculate the volume of the object marked with positive pixels
     on labels array.
@@ -59,7 +61,9 @@ def voxels(labels: np.ndarray, per_component: Literal[True]) -> np.ndarray:
 
 
 @measurement
-def voxels(labels: Labels, per_component: bool = False):
+def voxels(
+    labels: Labels, per_component: bool = False
+) -> Union[float, np.ndarray]:
     """
     Calculate the number of voxels of the object marked with positive
     pixels on labels array.
