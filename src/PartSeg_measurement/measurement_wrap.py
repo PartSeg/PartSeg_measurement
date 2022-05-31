@@ -77,6 +77,7 @@ class MeasurementWrapBase(ABC):
             if self._rename_kwargs.get(name, name) not in kwargs
             and name not in problematic_kwargs
             and value.kind != inspect.Parameter.VAR_KEYWORD
+            and value.default == inspect.Parameter.empty
         )
 
         if len(missed_kwargs) == 1:
@@ -326,8 +327,11 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
             x.kind == inspect.Parameter.VAR_KEYWORD
             for x in signature.parameters.values()
         ):
-            return tuple()
-        return tuple(signature.parameters.keys())
+            return {}
+        return {
+            x.name: x.default == inspect.Parameter.empty
+            for x in signature.parameters.values()
+        }
 
     def as_dict(self, serialize: bool = True) -> typing.Dict[str, typing.Any]:
         res = super().as_dict(serialize=serialize)
@@ -343,7 +347,11 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
 
         if self._pass_args:
             return self._measurement_func(
-                **{name: kwargs[name] for name in self._pass_args}
+                **{
+                    name: kwargs[name]
+                    for name, mandatory in self._pass_args.items()
+                    if name in kwargs or mandatory
+                }
             )
         return self._measurement_func(**kwargs)
 
