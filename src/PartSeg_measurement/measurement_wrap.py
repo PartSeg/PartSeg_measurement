@@ -363,7 +363,8 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
                 )
 
         for name in self._bind_args:
-            del annotations[name]
+            if name in annotations:
+                annotations.pop(name)
             del parameters[name]
 
         for new_name, original_name in self._rename_kwargs.items():
