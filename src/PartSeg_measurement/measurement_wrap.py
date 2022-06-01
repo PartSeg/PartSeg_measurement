@@ -287,7 +287,7 @@ class MeasurementCache:
         Try to get result from cache. If not found, calculate and store result.
 
         Parameters
-        ----------e
+        ----------
         func: typing.Callable
             Measurement function to be called. Need to be hashable
         kwargs
@@ -477,9 +477,17 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         self.__signature__ = self._calculate_signature(
             self._sources, self._operator
         )
-        self.__doc__ = self._prepare_doc(self._sources)
+        self.__doc__ = self._prepare_doc(
+            self._sources, self.name, self._rename_kwargs, self._bind_args
+        )
 
-    def _prepare_doc(self, sources: typing.Sequence) -> str:
+    @staticmethod
+    def _prepare_doc(
+        sources: typing.Sequence,
+        name: str,
+        rename_kwargs: typing.Dict[str, str],
+        bind_args: typing.Dict[str, typing.Any],
+    ) -> str:
         """
         Prepare docstring base on docstring of sources.
 
@@ -488,17 +496,26 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         sources: typing.Sequence
             Sequence of sources to prepare docstring for.
 
+        name: str
+            Name of operator.
+
+        rename_kwargs: typing.Dict[str, str]
+            Rename kwargs.
+
+        bind_args: typing.Dict[str, typing.Any]
+            Bind kwargs.
+
         Returns
         -------
         str
             Prepared docstring.
         """
-        reverse_rename_kwargs = {y: x for x, y in self._rename_kwargs.items()}
+        reverse_rename_kwargs = {y: x for x, y in rename_kwargs.items()}
 
         args = {}
         style = None
         raises = []
-        descriptions = [self.name]
+        descriptions = [name]
         for source in sources:
             if not (
                 isinstance(source, MeasurementWrapBase)
@@ -511,7 +528,7 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
             if style is None:
                 style = parsed.style
             for param in parsed.params:
-                if param.arg_name in self._bind_args:
+                if param.arg_name in bind_args:
                     continue
                 if param.arg_name in reverse_rename_kwargs:
                     param.arg_name = reverse_rename_kwargs[param.arg_name]
@@ -620,6 +637,9 @@ class MeasurementCalculation(typing.MutableSequence[MeasurementWrapBase]):
     def _update_signature(self):
         self.__signature__ = MeasurementCombinationWrap._calculate_signature(
             self._list
+        )
+        self.__doc__ = MeasurementCombinationWrap._prepare_doc(
+            self._list, "Measurement calculation", {}, {}
         )
 
     def __call__(self, **kwargs):
