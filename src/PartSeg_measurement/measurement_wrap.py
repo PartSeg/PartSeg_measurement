@@ -184,8 +184,7 @@ class MeasurementWrapBase(ABC):
         return self.__class__(**self.as_dict(serialize=False))
 
     def __str__(self):
-        # FIXME add signature
-        return self.name
+        return f"{self.name}{inspect.signature(self)}"
 
     def as_dict(self, serialize=True) -> typing.Dict[str, typing.Any]:
         """
