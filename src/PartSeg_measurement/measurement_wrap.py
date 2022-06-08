@@ -88,11 +88,27 @@ class BoundInfo(typing.NamedTuple):
 
 
 class NumpyArrayWrap:
-    def __init__(self, array: np.ndarray):
+    def __init__(self, array: np.ndarray, name: str = ""):
+        """
+        Wrap for storage metadata
+
+        Parameters
+        ----------
+        array : np.ndarray
+            array to be wrapped
+        name : str
+            name used for hash calculation to allow caching calculation
+        """
         self._array = array
+        if not name:
+            name = str(id(array))
+        self._name = name
 
     @property
     def array(self) -> np.ndarray:
+        """
+        data access
+        """
         return self._array
 
     @cached_property
@@ -112,6 +128,15 @@ class NumpyArrayWrap:
             i: BoundInfo(lower=lower[i], upper=upper[i])
             for i in range(1, lower.shape[0])
         }
+
+    def __hash__(self):
+        return hash((self.__class__.__name__, self._name))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self._name == other._name
+
+    def __getitem__(self, item):
+        return self.__class__(self._array[item], name=f"{self._name}_{item}")
 
 
 class MeasurementWrapBase(ABC):

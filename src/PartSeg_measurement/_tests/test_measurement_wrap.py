@@ -43,6 +43,22 @@ class TestNumpyArrayWrap:
         with pytest.raises(ValueError, match="Only integer arrays"):
             print(wrap.components_bounds)
 
+    def test_hash(self):
+        data1 = np.empty((10, 10), dtype=np.uint8)
+        data2 = np.empty((10, 10), dtype=np.uint8)
+        wrap1 = NumpyArrayWrap(data1)
+        wrap2 = NumpyArrayWrap(data2)
+        wrap3 = NumpyArrayWrap(data1)
+        assert hash(wrap1) != hash(wrap2)
+        assert hash(wrap1) == hash(wrap3)
+        assert wrap1 == wrap3
+
+        assert hash(wrap1[2:-2, 2:-2]) == hash(wrap3[2:-2, 2:-2])
+        assert wrap1[2:-2, 2:-2] == wrap3[2:-2, 2:-2]
+        assert hash(wrap1[2:-2, 2:-2]) != hash(wrap1[2:-2, 3:-1])
+
+        assert wrap1[2:-2, 2:-2].array.shape == (6, 6)
+
 
 class TestBoundInfo:
     def test_base(self):
