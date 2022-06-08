@@ -4,10 +4,12 @@ import typing
 import warnings
 from abc import ABC
 from copy import copy
+from functools import cached_property
 
 import docstring_parser
 import nme
 import numpy as np
+from PartSegCore_compiled_backend.utils import calc_bounds
 
 from .types import Labels
 
@@ -74,7 +76,8 @@ class BoundInfo(typing.NamedTuple):
         """
 
         return BoundInfo(
-            np.delete(self.lower, axis), np.delete(self.upper, axis)
+            lower=np.delete(self.lower, axis),
+            upper=np.delete(self.upper, axis),
         )
 
     def __str__(self):
@@ -82,6 +85,33 @@ class BoundInfo(typing.NamedTuple):
             f"{self.__class__.__name__}(lower={list(self.lower)},"
             f" upper={list(self.upper)})"
         )
+
+
+class NumpyArrayWrap:
+    def __init__(self, array: np.ndarray):
+        self._array = array
+
+    @property
+    def array(self) -> np.ndarray:
+        return self._array
+
+    @cached_property
+    def components_bounds(self) -> typing.Dict[int, BoundInfo]:
+        """
+        Bounds of each component
+
+        Returns
+        -------
+        bounds : typing.Dict[int, BoundInfo]
+            Bounds of each component
+        """
+        if not np.issubdtype(self._array.dtype, np.integer):
+            raise ValueError("Only integer arrays are supported")
+        lower, upper = calc_bounds(self._array)
+        return {
+            i: BoundInfo(lower=lower[i], upper=upper[i])
+            for i in range(1, lower.shape[0])
+        }
 
 
 class MeasurementWrapBase(ABC):

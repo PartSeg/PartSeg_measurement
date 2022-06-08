@@ -14,9 +14,34 @@ from PartSeg_measurement.measurement_wrap import (
     MeasurementCalculation,
     MeasurementCombinationWrap,
     MeasurementFunctionWrap,
+    NumpyArrayWrap,
     measurement,
 )
 from PartSeg_measurement.types import Image, Labels
+
+
+class TestNumpyArrayWrap:
+    def test_base(self):
+        data = np.zeros((10, 10), dtype=np.uint8)
+        data[2:5, 2:-2] = 1
+        data[6:-2, 2:5] = 2
+        wrap = NumpyArrayWrap(array=data)
+        assert len(wrap.components_bounds) == 2
+        assert wrap.array is data
+        assert tuple(wrap.components_bounds[1].box_size()) == (3, 6)
+
+    def test_missing_component(self):
+        data = np.zeros((10, 10), dtype=np.uint8)
+        data[2:5, 2:-2] = 1
+        data[6:-2, 2:5] = 3
+        wrap = NumpyArrayWrap(array=data)
+        assert len(wrap.components_bounds) == 3
+        assert wrap.array is data
+
+    def test_raise_exception(self):
+        wrap = NumpyArrayWrap(array=np.zeros((10, 10), dtype=np.float))
+        with pytest.raises(ValueError, match="Only integer arrays"):
+            print(wrap.components_bounds)
 
 
 class TestBoundInfo:
