@@ -4,9 +4,14 @@ import typing
 import warnings
 from abc import ABC
 from copy import copy
+from functools import cached_property
 
 import docstring_parser
 import nme
+import numpy as np
+from PartSegCore_compiled_backend.utils import calc_bounds
+
+from .types import Labels
 
 MeasurementWrapType = typing.TypeVar(
     "MeasurementWrapType", bound="MeasurementWrapBase"
@@ -15,6 +20,123 @@ MeasurementWrapType = typing.TypeVar(
 
 class UnitsException(Exception):
     """Raised where units do not match"""
+
+
+class BoundInfo(typing.NamedTuple):
+    """
+    Information about bounding box
+
+    Attributes
+    ----------
+    lower : np.ndarray
+        Lower bound of a component
+    upper : np.ndarray
+        Upper bound of a component
+    """
+
+    lower: np.ndarray
+    upper: np.ndarray
+
+    def box_size(self) -> np.ndarray:
+        """Size of bounding box"""
+        return self.upper - self.lower + 1
+
+    def get_slices(self, margin=0) -> typing.List[slice]:
+        """
+        Get slices for each dimension
+
+        Parameters
+        ----------
+        margin : int
+            Margin to add to each bound
+
+        Returns
+        -------
+        slices : typing.List[slice]
+            List of slices for each dimension
+        """
+        return [
+            slice(max(x - margin, 0), y + 1 + margin)
+            for x, y in zip(self.lower, self.upper)
+        ]
+
+    def del_dim(self, axis: int) -> "BoundInfo":
+        """
+        Return copy of bound info without given axis
+
+        Parameters
+        ----------
+        axis : int
+            Axis to remove
+
+        Returns
+        -------
+        bound_info : BoundInfo
+            Copy of bound info without given axis
+        """
+
+        return BoundInfo(
+            lower=np.delete(self.lower, axis),
+            upper=np.delete(self.upper, axis),
+        )
+
+    def __str__(self):
+        return (
+            f"{self.__class__.__name__}(lower={list(self.lower)},"
+            f" upper={list(self.upper)})"
+        )
+
+
+class NumpyArrayWrap:
+    def __init__(self, array: np.ndarray, name: str = ""):
+        """
+        Wrap for storage metadata
+
+        Parameters
+        ----------
+        array : np.ndarray
+            array to be wrapped
+        name : str
+            name used for hash calculation to allow caching calculation
+        """
+        self._array = array
+        if not name:
+            name = str(id(array))
+        self._name = name
+
+    @property
+    def array(self) -> np.ndarray:
+        """
+        data access
+        """
+        return self._array
+
+    @cached_property
+    def components_bounds(self) -> typing.Dict[int, BoundInfo]:
+        """
+        Bounds of each component
+
+        Returns
+        -------
+        bounds : typing.Dict[int, BoundInfo]
+            Bounds of each component
+        """
+        if not np.issubdtype(self._array.dtype, np.integer):
+            raise ValueError("Only integer arrays are supported")
+        lower, upper = calc_bounds(self._array)
+        return {
+            i: BoundInfo(lower=lower[i], upper=upper[i])
+            for i in range(1, lower.shape[0])
+        }
+
+    def __hash__(self):
+        return hash((self.__class__.__name__, self._name))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self._name == other._name
+
+    def __getitem__(self, item):
+        return self.__class__(self._array[item], name=f"{self._name}_{item}")
 
 
 class MeasurementWrapBase(ABC):
@@ -77,6 +199,7 @@ class MeasurementWrapBase(ABC):
             if self._rename_kwargs.get(name, name) not in kwargs
             and name not in problematic_kwargs
             and value.kind != inspect.Parameter.VAR_KEYWORD
+            and value.default == inspect.Parameter.empty
         )
 
         if len(missed_kwargs) == 1:
@@ -116,8 +239,7 @@ class MeasurementWrapBase(ABC):
         return self.__class__(**self.as_dict(serialize=False))
 
     def __str__(self):
-        # FIXME add signature
-        return self.name
+        return f"{self.name}{inspect.signature(self)}"
 
     def as_dict(self, serialize=True) -> typing.Dict[str, typing.Any]:
         """
@@ -187,21 +309,23 @@ class MeasurementWrapBase(ABC):
         return MeasurementCombinationWrap(
             operator=pow,
             sources=(copy(self), power, modulo),
-            name=f"{self.name} ** {power}",
+            name=f"({self.name} ** {power})",
         )
 
     def __mul__(self, other):
         return MeasurementCombinationWrap(
             operator=operator.mul,
             sources=(copy(self), copy(other)),
-            name=f"{self} * {other}",
+            name=f"({self.name} * "
+            f"{other.name if hasattr(other, 'name') else other})",
         )
 
     def __truediv__(self, other):
         return MeasurementCombinationWrap(
             operator=operator.truediv,
             sources=(copy(self), copy(other)),
-            name=f"{self} / {other}",
+            name=f"({self.name} / "
+            f"{other.name if hasattr(other, 'name') else other})",
         )
 
 
@@ -219,7 +343,7 @@ class MeasurementCache:
         Try to get result from cache. If not found, calculate and store result.
 
         Parameters
-        ----------e
+        ----------
         func: typing.Callable
             Measurement function to be called. Need to be hashable
         kwargs
@@ -271,10 +395,32 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
 
         # functools.wraps(measurement_func)(self)
 
-        annotations = copy(measurement_func.__annotations__)
+        self.__signature__, self.__annotations__ = self._prepare_signature(
+            signature, measurement_func.__annotations__
+        )
+        self.__doc__ = self._prepare_docs(measurement_func.__doc__)
+        self.__name__ = measurement_func.__name__
+
+    def _prepare_signature(
+        self, signature: inspect.Signature, annotations: dict
+    ):
+        annotations = copy(annotations)
         parameters = dict(**signature.parameters)
+        if parameters and "per_component" not in parameters:
+            fist_arg = list(parameters.values())[0]
+            if fist_arg.annotation is Labels:
+                # FIXME add better recognition of labels
+                annotations["per_component"] = bool
+                parameters["per_component"] = inspect.Parameter(
+                    "per_component",
+                    inspect.Parameter.KEYWORD_ONLY,
+                    default=False,
+                    annotation=bool,
+                )
+
         for name in self._bind_args:
-            del annotations[name]
+            if name in annotations:
+                annotations.pop(name)
             del parameters[name]
 
         for new_name, original_name in self._rename_kwargs.items():
@@ -290,15 +436,13 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
                 parameters[name] = parameters[name].replace(
                     kind=inspect.Parameter.KEYWORD_ONLY
                 )
-
-        self.__annotations__ = annotations
-
-        self.__signature__ = inspect.Signature(
-            parameters=list(parameters.values()),
-            return_annotation=signature.return_annotation,
+        return (
+            inspect.Signature(
+                parameters=list(parameters.values()),
+                return_annotation=signature.return_annotation,
+            ),
+            annotations,
         )
-        self.__doc__ = self._prepare_docs(measurement_func.__doc__)
-        self.__name__ = measurement_func.__name__
 
     def _prepare_docs(self, doc: typing.Optional[str]) -> str:
         reverse_rename_kwargs = {y: x for x, y in self._rename_kwargs.items()}
@@ -326,8 +470,11 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
             x.kind == inspect.Parameter.VAR_KEYWORD
             for x in signature.parameters.values()
         ):
-            return tuple()
-        return tuple(signature.parameters.keys())
+            return {}
+        return {
+            x.name: x.default == inspect.Parameter.empty
+            for x in signature.parameters.values()
+        }
 
     def as_dict(self, serialize: bool = True) -> typing.Dict[str, typing.Any]:
         res = super().as_dict(serialize=serialize)
@@ -343,7 +490,11 @@ class MeasurementFunctionWrap(MeasurementWrapBase):
 
         if self._pass_args:
             return self._measurement_func(
-                **{name: kwargs[name] for name in self._pass_args}
+                **{
+                    name: kwargs[name]
+                    for name, mandatory in self._pass_args.items()
+                    if name in kwargs or mandatory
+                }
             )
         return self._measurement_func(**kwargs)
 
@@ -382,9 +533,17 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         self.__signature__ = self._calculate_signature(
             self._sources, self._operator
         )
-        self.__doc__ = self._prepare_doc(self._sources)
+        self.__doc__ = self._prepare_doc(
+            self._sources, self.name, self._rename_kwargs, self._bind_args
+        )
 
-    def _prepare_doc(self, sources: typing.Sequence) -> str:
+    @staticmethod
+    def _prepare_doc(
+        sources: typing.Sequence,
+        name: str,
+        rename_kwargs: typing.Dict[str, str],
+        bind_args: typing.Dict[str, typing.Any],
+    ) -> str:
         """
         Prepare docstring base on docstring of sources.
 
@@ -393,17 +552,26 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
         sources: typing.Sequence
             Sequence of sources to prepare docstring for.
 
+        name: str
+            Name of operator.
+
+        rename_kwargs: typing.Dict[str, str]
+            Rename kwargs.
+
+        bind_args: typing.Dict[str, typing.Any]
+            Bind kwargs.
+
         Returns
         -------
         str
             Prepared docstring.
         """
-        reverse_rename_kwargs = {y: x for x, y in self._rename_kwargs.items()}
+        reverse_rename_kwargs = {y: x for x, y in rename_kwargs.items()}
 
         args = {}
         style = None
         raises = []
-        descriptions = [self.name]
+        descriptions = [name]
         for source in sources:
             if not (
                 isinstance(source, MeasurementWrapBase)
@@ -416,14 +584,16 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
             if style is None:
                 style = parsed.style
             for param in parsed.params:
-                if param.arg_name in self._bind_args:
+                if param.arg_name in bind_args:
                     continue
                 if param.arg_name in reverse_rename_kwargs:
                     param.arg_name = reverse_rename_kwargs[param.arg_name]
                 if param.arg_name not in args:
                     args[param.arg_name] = param
 
-        target_doc = docstring_parser.Docstring(style=style)
+        target_doc = docstring_parser.Docstring(
+            style=docstring_parser.DocstringStyle.NUMPYDOC
+        )
         target_doc.meta.extend(args.values())
         target_doc.meta.extend(raises)
         target_doc.short_description = "\n\n".join(descriptions)
@@ -525,6 +695,9 @@ class MeasurementCalculation(typing.MutableSequence[MeasurementWrapBase]):
     def _update_signature(self):
         self.__signature__ = MeasurementCombinationWrap._calculate_signature(
             self._list
+        )
+        self.__doc__ = MeasurementCombinationWrap._prepare_doc(
+            self._list, "Measurement calculation", {}, {}
         )
 
     def __call__(self, **kwargs):

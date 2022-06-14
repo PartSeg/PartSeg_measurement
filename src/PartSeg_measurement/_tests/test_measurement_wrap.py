@@ -5,15 +5,92 @@ import operator
 
 import docstring_parser
 import nme
+import numpy as np
 import pytest
 
 from PartSeg_measurement.measurement_wrap import (
+    BoundInfo,
     MeasurementCache,
     MeasurementCalculation,
     MeasurementCombinationWrap,
     MeasurementFunctionWrap,
+    NumpyArrayWrap,
     measurement,
 )
+from PartSeg_measurement.types import Image, Labels
+
+
+class TestNumpyArrayWrap:
+    def test_base(self):
+        data = np.zeros((10, 10), dtype=np.uint8)
+        data[2:5, 2:-2] = 1
+        data[6:-2, 2:5] = 2
+        wrap = NumpyArrayWrap(array=data)
+        assert len(wrap.components_bounds) == 2
+        assert wrap.array is data
+        assert tuple(wrap.components_bounds[1].box_size()) == (3, 6)
+
+    def test_missing_component(self):
+        data = np.zeros((10, 10), dtype=np.uint8)
+        data[2:5, 2:-2] = 1
+        data[6:-2, 2:5] = 3
+        wrap = NumpyArrayWrap(array=data)
+        assert len(wrap.components_bounds) == 3
+        assert wrap.array is data
+
+    def test_raise_exception(self):
+        wrap = NumpyArrayWrap(array=np.zeros((10, 10), dtype=np.float))
+        with pytest.raises(ValueError, match="Only integer arrays"):
+            print(wrap.components_bounds)
+
+    def test_hash(self):
+        data1 = np.empty((10, 10), dtype=np.uint8)
+        data2 = np.empty((10, 10), dtype=np.uint8)
+        wrap1 = NumpyArrayWrap(data1)
+        wrap2 = NumpyArrayWrap(data2)
+        wrap3 = NumpyArrayWrap(data1)
+        assert hash(wrap1) != hash(wrap2)
+        assert hash(wrap1) == hash(wrap3)
+        assert wrap1 == wrap3
+
+        assert hash(wrap1[2:-2, 2:-2]) == hash(wrap3[2:-2, 2:-2])
+        assert wrap1[2:-2, 2:-2] == wrap3[2:-2, 2:-2]
+        assert hash(wrap1[2:-2, 2:-2]) != hash(wrap1[2:-2, 3:-1])
+
+        assert wrap1[2:-2, 2:-2].array.shape == (6, 6)
+
+
+class TestBoundInfo:
+    def test_base(self):
+        bound_info = BoundInfo(np.array([1, 10, 10]), np.array([20, 20, 20]))
+        assert np.all(bound_info.lower == np.array([1, 10, 10]))
+        assert np.all(bound_info.upper == np.array([20, 20, 20]))
+        assert np.all(bound_info.box_size() == np.array([20, 11, 11]))
+        assert "[1, 10, 10]" in str(bound_info)
+
+    def test_slice(self):
+        bound_info = BoundInfo(np.array([1, 10, 10]), np.array([20, 20, 20]))
+        assert bound_info.get_slices(0) == [
+            slice(1, 21),
+            slice(10, 21),
+            slice(10, 21),
+        ]
+        assert bound_info.get_slices(1) == [
+            slice(0, 22),
+            slice(9, 22),
+            slice(9, 22),
+        ]
+        assert bound_info.get_slices(2) == [
+            slice(0, 23),
+            slice(8, 23),
+            slice(8, 23),
+        ]
+
+    def test_del_dim(self):
+        bound_info = BoundInfo(np.array([1, 10, 10]), np.array([20, 20, 20]))
+        bound_info2 = bound_info.del_dim(1)
+        assert np.all(bound_info2.lower == np.array([1, 10]))
+        assert np.all(bound_info2.upper == np.array([20, 20]))
 
 
 class TestMeasurementFunctionWrap:
@@ -248,6 +325,15 @@ class TestMeasurementFunctionWrap:
         assert "{'y': 'b'}" in repr(wrap.rename_parameter("b", "y"))
         assert "{'b': 1}" in repr(wrap.bind(b=1))
 
+    def test_per_component_add(self):
+        def func(a: Labels, b: Image) -> float:
+            return b[a > 0].sum()
+
+        wrap = MeasurementFunctionWrap(measurement_func=func)
+        sig = inspect.signature(wrap)
+        assert sig.parameters["a"].annotation == Labels
+        assert sig.parameters["per_component"].annotation == bool
+
 
 class TestMeasurementCombinationWrap:
     def test_div(self):
@@ -261,7 +347,7 @@ class TestMeasurementCombinationWrap:
         wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         divided = wrap1 / wrap2
         assert divided(a=3, b=1) == 2
-        assert str(divided) == "func1 / func2"
+        assert str(divided) == "(func1 / func2)(*, a: int, b: float)"
 
     def test_div_2(self):
         def func1(a: int, b: float) -> float:
@@ -270,7 +356,7 @@ class TestMeasurementCombinationWrap:
         wrap = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         wrap2 = wrap / 2
         assert wrap2(a=2, b=4) == 3
-        assert str(wrap2) == "func1 / 2"
+        assert str(wrap2) == "(func1 / 2)(*, a: int, b: float)"
 
     def test_mul(self):
         def func1(a: int, b: float) -> float:
@@ -283,7 +369,7 @@ class TestMeasurementCombinationWrap:
         wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         mul = wrap1 * wrap2
         assert mul(a=2, b=1) == 3
-        assert str(mul) == "Func1 * func2"
+        assert str(mul) == "(Func1 * func2)(*, a: int, b: float)"
 
     def test_mul_2(self):
         def func1(a: int, b: float) -> float:
@@ -292,7 +378,7 @@ class TestMeasurementCombinationWrap:
         wrap = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         wrap2 = wrap * 2
         assert wrap2(a=1, b=2) == 6
-        assert str(wrap2) == "func1 * 2"
+        assert str(wrap2) == "(func1 * 2)(*, a: int, b: float)"
 
     def test_power(self):
         def func1(a: int, b: float) -> float:
@@ -300,9 +386,9 @@ class TestMeasurementCombinationWrap:
 
         wrap = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         pow1 = wrap**2.0
-        assert str(pow1) == "func1 ** 2.0"
+        assert str(pow1) == "(func1 ** 2.0)(*, a: int, b: float)"
         pow2 = pow1**3.0
-        assert str(pow2) == "func1 ** 2.0 ** 3.0"
+        assert str(pow2) == "((func1 ** 2.0) ** 3.0)(*, a: int, b: float)"
         assert pow2(a=1, b=2) == 3**6
         # FIXME assert str(pow2) == "func1 ** 6.0"
 
