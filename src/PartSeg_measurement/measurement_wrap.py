@@ -309,21 +309,23 @@ class MeasurementWrapBase(ABC):
         return MeasurementCombinationWrap(
             operator=pow,
             sources=(copy(self), power, modulo),
-            name=f"{self.name} ** {power}",
+            name=f"({self.name} ** {power})",
         )
 
     def __mul__(self, other):
         return MeasurementCombinationWrap(
             operator=operator.mul,
             sources=(copy(self), copy(other)),
-            name=f"{self} * {other}",
+            name=f"({self.name} * "
+            f"{other.name if hasattr(other, 'name') else other})",
         )
 
     def __truediv__(self, other):
         return MeasurementCombinationWrap(
             operator=operator.truediv,
             sources=(copy(self), copy(other)),
-            name=f"{self} / {other}",
+            name=f"({self.name} / "
+            f"{other.name if hasattr(other, 'name') else other})",
         )
 
 
@@ -589,7 +591,9 @@ class MeasurementCombinationWrap(MeasurementWrapBase):
                 if param.arg_name not in args:
                     args[param.arg_name] = param
 
-        target_doc = docstring_parser.Docstring(style=style)
+        target_doc = docstring_parser.Docstring(
+            style=docstring_parser.DocstringStyle.NUMPYDOC
+        )
         target_doc.meta.extend(args.values())
         target_doc.meta.extend(raises)
         target_doc.short_description = "\n\n".join(descriptions)

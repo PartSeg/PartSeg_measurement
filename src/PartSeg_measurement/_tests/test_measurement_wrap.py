@@ -347,7 +347,7 @@ class TestMeasurementCombinationWrap:
         wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         divided = wrap1 / wrap2
         assert divided(a=3, b=1) == 2
-        assert str(divided) == "func1 / func2"
+        assert str(divided) == "(func1 / func2)(*, a: int, b: float)"
 
     def test_div_2(self):
         def func1(a: int, b: float) -> float:
@@ -356,7 +356,7 @@ class TestMeasurementCombinationWrap:
         wrap = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         wrap2 = wrap / 2
         assert wrap2(a=2, b=4) == 3
-        assert str(wrap2) == "func1 / 2"
+        assert str(wrap2) == "(func1 / 2)(*, a: int, b: float)"
 
     def test_mul(self):
         def func1(a: int, b: float) -> float:
@@ -369,7 +369,7 @@ class TestMeasurementCombinationWrap:
         wrap2 = MeasurementFunctionWrap(measurement_func=func2, name="func2")
         mul = wrap1 * wrap2
         assert mul(a=2, b=1) == 3
-        assert str(mul) == "Func1 * func2"
+        assert str(mul) == "(Func1 * func2)(*, a: int, b: float)"
 
     def test_mul_2(self):
         def func1(a: int, b: float) -> float:
@@ -378,7 +378,7 @@ class TestMeasurementCombinationWrap:
         wrap = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         wrap2 = wrap * 2
         assert wrap2(a=1, b=2) == 6
-        assert str(wrap2) == "func1 * 2"
+        assert str(wrap2) == "(func1 * 2)(*, a: int, b: float)"
 
     def test_power(self):
         def func1(a: int, b: float) -> float:
@@ -386,9 +386,9 @@ class TestMeasurementCombinationWrap:
 
         wrap = MeasurementFunctionWrap(measurement_func=func1, name="func1")
         pow1 = wrap**2.0
-        assert str(pow1) == "func1 ** 2.0"
+        assert str(pow1) == "(func1 ** 2.0)(*, a: int, b: float)"
         pow2 = pow1**3.0
-        assert str(pow2) == "func1 ** 2.0 ** 3.0"
+        assert str(pow2) == "((func1 ** 2.0) ** 3.0)(*, a: int, b: float)"
         assert pow2(a=1, b=2) == 3**6
         # FIXME assert str(pow2) == "func1 ** 6.0"
 
